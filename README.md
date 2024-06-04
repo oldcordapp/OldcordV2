@@ -52,3 +52,58 @@ const config = {
 
 export default config;
 ```
+
+I use nginx as my reverse proxy on a web server which points to my VPS running the actual OldCord Instance, here's an example server block I used for staging_2015.oldcordapp.com
+
+```
+
+    server {
+        listen 80;
+        
+        server_name staging_2015.oldcordapp.com www.staging_2015.oldcordapp.com;
+        
+        listen 443 ssl;
+	      ssl_certificate /etc/nginx/fullchain2.pem;
+	      ssl_certificate_key /etc/nginx/privkey2.pem;
+	
+	      if ($scheme != "https") {
+        	  return 301 https://$host$request_uri;
+    	  }
+     
+        location / {
+            proxy_pass http://SERVERIP:OLDCORDPORT;
+            proxy_set_header Host $host;
+            client_max_body_size 100M;
+            proxy_pass_request_headers on;
+            add_header Last-Modified $date_gmt;
+            add_header Cache-Control 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0';
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-Forwarded-For $remote_addr;
+            proxy_set_header X-Forwarded-Host $remote_addr;
+            proxy_no_cache 1;
+            proxy_cache_bypass 1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+        }
+        
+        location /gateway {
+            proxy_pass http://SERVERIP:OLDCORDPORT;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        error_page 404 /404.html;
+          location = /40x.html {
+        }
+    
+        error_page 500 502 503 504 /50x.html;
+          location = /50x.html {
+        }
+    }
+```
