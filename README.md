@@ -7,3 +7,4 @@ Fun fact: this is a rewrite of the original code already, in the original code 2
 # Credits
 Myself - literally 90% of the code
 Ziad from hummus for 10% of the code (Permissions handling & token stuff) - love you
+oh and discord.js devs for snowflake stuff
