@@ -24,6 +24,10 @@ const configuration = {
 }
 ```
 
+```
+Run npm install in the base directory
+```
+
 For deployment on a live production server!!! You'd need to modify /utils/config.ts to match something like this as well:
 
 ```js
@@ -51,6 +55,10 @@ const config = {
 };
 
 export default config;
+```
+
+```
+Then after changing the config and database configuration, you can go ahead and build and run the instance with build.bat
 ```
 
 I use nginx as my reverse proxy on a web server which points to my VPS running the actual OldCord Instance, here's an example server block I used for staging_2015.oldcordapp.com
