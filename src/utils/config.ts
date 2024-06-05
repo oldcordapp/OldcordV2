@@ -7,13 +7,11 @@ const config = {
     use_same_port: true,
     port: 1337,
     cache404s: false,
-    gateway_has_no_port: true,
+    gateway_has_no_port: false,
     instance_name: "2015 Staging",
     instance_description: "An oldcord instance",
     instance_flags: [
-        "NO_REGISTRATION",
-"NO_INVITE_CREATION",
-
+        "NO_FLAGS"
     ],
     cert_path: "",
     key_path: "",
