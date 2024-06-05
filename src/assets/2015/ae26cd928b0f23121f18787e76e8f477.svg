@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="54px" height="36px" viewBox="0 0 54 36" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:sketch="https://web.archive.org/web/20151128205345/http://www.bohemiancoding.com/sketch/ns">
+    <!-- Generator: Sketch 3.3.3 (12081) - http://www.bohemiancoding.com/sketch -->
+    <title>Rectangle 2517 + Group</title>
+    <desc>Created with Sketch.</desc>
+    <defs>
+        <linearGradient x1="32.7313282%" y1="0.00382390855%" x2="266.60677%" y2="680.71403%" id="linearGradient-1">
+            <stop stop-color="#262626" stop-opacity="0" offset="0%"></stop>
+            <stop stop-color="#262626" offset="100%"></stop>
+        </linearGradient>
+    </defs>
+    <g id="Welcome" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" sketch:type="MSPage">
+        <g id="Desktop-HD---Twitch-Intagration---Account-01" sketch:type="MSArtboardGroup" transform="translate(-796.000000, -200.000000)">
+            <g id="//-Modal" sketch:type="MSLayerGroup" transform="translate(320.000000, 187.000000)">
+                <g id="//-Settings" transform="translate(191.000000, 0.000000)" sketch:type="MSShapeGroup">
+                    <g id="Group">
+                        <g id="TwitterLogo_white" transform="translate(277.000000, -5.359375)">
+                            <g id="Rectangle-2517-+-Group" transform="translate(0.000000, 0.359375)">
+                                <rect id="Rectangle-2517" x="8" y="8" width="54" height="54"></rect>
+                                <g id="Group" transform="translate(8.000000, 16.359375)">
+                                    <path d="M40.4181819,15.8090909 L40.4181819,1.68181818 L27,8.74545455 L13.5818182,1.68181818 L0.0701298702,8.74545455 L0.0701298702,22.8727273 L27,37 L53.9298702,22.8727273 L53.9298702,8.74545455 L40.4181819,15.8090909 L40.4181819,15.8090909 Z" id="Shape" fill="#E62117"></path>
+                                    <path d="M13.5818182,15.8090909 L13.5818182,29.9363636 L27,22.8727273 L13.5818182,15.8090909 L13.5818182,15.8090909 Z" id="Shape" fill="#B0261F"></path>
+                                    <path d="M27,8.74545455 L13.5818182,15.8090909 L27,22.8727273 L40.4181819,15.8090909 L27,8.74545455 L27,8.74545455 Z" id="Shape" fill="#CB241B"></path>
+                                    <path d="M13.5818182,1.68181818 L13.5818182,15.8090909 L0.0701298702,8.74545455 L13.5818182,1.68181818 L13.5818182,1.68181818 Z" id="Shape" fill="#CB241B"></path>
+                                    <path d="M13.5818182,15.8090909 L13.5818182,29.9363636 L0.0701298702,22.8727273 L13.5818182,15.8090909 L13.5818182,15.8090909 Z" id="Shape" fill="#952924"></path>
+                                    <path d="M27,22.8727273 L27,37 L40.4181819,29.9363636 L40.4181819,15.8090909 L27,22.8727273 L27,22.8727273 Z" id="Shape" fill="#B0261F"></path>
+                                    <path d="M27,22.8727273 L27,37 L13.5818182,29.9363636 L27,22.8727273 L27,22.8727273 Z" id="Shape" fill="#952924"></path>
+                                    <path d="M0.0701298702,22.8727273 L0.0701298702,8.74545455 L13.5818182,15.8090909 L0.0701298702,22.8727273 L0.0701298702,22.8727273 Z" id="Shape" fill="#B0261F"></path>
+                                    <path d="M40.4181819,1.68181818 L40.4181819,15.8090909 L53.9298702,8.74545455 L40.4181819,1.68181818 L40.4181819,1.68181818 Z" id="Shape" fill="#FFFFFF"></path>
+                                    <path d="M53.9298702,8.74545455 L52.2818182,9.61086695 L40.4181819,1.68181818 L53.9298702,8.74545455 L53.9298702,8.74545455 Z" id="Shape" fill="url(#linearGradient-1)"></path>
+                                    <path d="M40.4181819,15.8090909 L40.4181819,29.9363636 L53.9298702,22.8727273 L40.4181819,15.8090909 L40.4181819,15.8090909 Z" id="Shape" fill="#CB241B"></path>
+                                </g>
+                                <rect id="Rectangle-1083" opacity="0.100000001" x="0" y="0" width="70" height="70" rx="3"></rect>
+                            </g>
+                        </g>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

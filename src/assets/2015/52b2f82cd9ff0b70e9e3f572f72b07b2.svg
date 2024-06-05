@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="28px" height="21px" viewBox="0 0 28 21" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:sketch="http://www.bohemiancoding.com/sketch/ns">
+    <!-- Generator: Sketch 3.3.3 (12081) - http://www.bohemiancoding.com/sketch -->
+    <title>Group</title>
+    <desc>Created with Sketch.</desc>
+    <defs></defs>
+    <g id="Welcome" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" sketch:type="MSPage">
+        <g id="Desktop-HD---Twitch-Intagration" sketch:type="MSArtboardGroup" transform="translate(-552.000000, -355.000000)" fill="#43B581">
+            <g id="//-Modal" sketch:type="MSLayerGroup" transform="translate(319.000000, 187.000000)">
+                <g id="//-Settings" transform="translate(193.000000, 0.000000)" sketch:type="MSShapeGroup">
+                    <g id="Group" transform="translate(40.000000, 168.000000)">
+                        <path d="M9.02017593,5.96852303 L15,5.96852303 L15,4.03140879 L9.02017593,4.03140879 L9.02017593,7.63833441e-14 L6.02870989,7.63833441e-14 L6.02870989,4.03140879 L0,4.03140879 L0,5.968523 L6.02870989,5.96852303 C6.02870989,5.96852303 6.11297955,6.62953995 6.02870989,7 C5.14387843,10.3753027 4.25561798,12.3486683 0,14.4479419 L0.884831461,17 C4.92977528,14.9007264 7.03651685,12.2663438 7.96348315,9.34382567 C8.84831461,11.566586 10.3651685,13.377724 12.0926966,15.0242131 L13.0196629,12.5133172 C11.25,10.8256659 9.90500739,9.38498792 9.02017593,5.96852303 Z" id="Shape"></path>
+                        <path d="M18.2222222,4 L12,21 L14.6666667,21 L16.4444444,15.8958838 L23.5555556,15.8958838 L25.3333333,21 L28,21 L21.7777778,4 L18.2222222,4 Z M17.3333333,13.3438257 L20,6.55205811 L22.6666667,13.3849879 L17.3333333,13.3438257 L17.3333333,13.3438257 Z" id="Shape"></path>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>
