@@ -5,9 +5,9 @@ Fun fact: this is a rewrite of the original code already, in the original code 2
 # Dont ask for WebRTC as it most likely will never be finished, my brain too small for that
 
 # Credits
-Myself - literally 90% of the code
-Ziad from hummus for 10% of the code (Permissions handling & token stuff) - love you
-oh and discord.js devs for snowflake stuff
+Myself - literally 90% of the code <br />
+Ziad from hummus for 10% of the code (Permissions handling & token stuff) - love you <br />
+oh and discord.js devs for snowflake stuff <br />
 
 # Setup
 First you need a postgres server & db running on your server/machine, then you'd need to replace the user, password and database name + host/port if required in /utils/database.ts
