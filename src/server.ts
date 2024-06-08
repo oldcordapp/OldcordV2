@@ -74,6 +74,14 @@ app.get("/assets/:asset", async (req: Request, res: Response) => {
         return res.status(404).send("File not found");
     }
 
+    if (req.params.asset.includes(".map")) {
+        cached404s[req.params.asset] = 1;
+
+        return res.status(404).send("File not found");
+
+        //aint no way you're getting those lol
+    }
+
     let year = release.includes("2015") ? "2015" : release.includes("2016") ? "2016" : "2017";
 
     if (!fs.existsSync(`${__dirname}/assets/${req.params.asset}`) && !fs.existsSync(`${__dirname}/assets/${year}/${req.params.asset}`)) {
