@@ -112,7 +112,9 @@ app.get("/assets/:asset", async (req: Request, res: Response) => {
                 let str = Buffer.from(body).toString("utf-8");
 
                 str = str.replace("cdn.discordapp.com", (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
+                str = str.replace(`n="discord.gg"`, `n="${(config.local_deploy ? config.base_url + ":" + config.port : config.base_url) + "/invites"}"`);
                 str = str.replace("discord.gg", (config.local_deploy ? config.base_url + ":" + config.port : config.base_url) + "/invites");
+                str = str.replace(`"discord.gg"`, `"${(config.local_deploy ? config.base_url + ":" + config.port : config.base_url)}/invites"`);
                 str = str.replace("d3dsisomax34re.cloudfront.net", (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
                 str = str.replace(/discordapp.com/g, (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
 
@@ -187,7 +189,7 @@ app.get("/api/servers/:guildid/widget.json", async (req: Request, res: Response)
                 const guild_invites: Invite[] = await database.getGuildInvites(req.params.guildid);
 
                 if (guild_invites.length == 0) {
-                    const invite_shit = await database.createInvite(req.params.guildid, widget.channel_id, "1121063764309889024", false, 0, 0, false);
+                    const invite_shit = await database.createInvite(req.params.guildid, widget.channel_id, "1121063764309889024", false, 0, 0, false, false);
                     
                     if (invite_shit != null) {
                         invite = `${config.use_wss ? 'https' : 'http'}://${config.base_url}${config.local_deploy ? `:${config.port}` : ''}/invite/${invite_shit.code}`;
@@ -196,7 +198,7 @@ app.get("/api/servers/:guildid/widget.json", async (req: Request, res: Response)
                     const try_find_invite: Invite[] | [] = guild_invites.filter(x => x.channel.id == widget.channel_id && x.max_uses == 0 && x.max_age == 0);
 
                     if (try_find_invite.length == 0) {
-                        const invite_shit = await database.createInvite(req.params.guildid, widget.channel_id, "1121063764309889024", false, 0, 0, false);
+                        const invite_shit = await database.createInvite(req.params.guildid, widget.channel_id, "1121063764309889024", false, 0, 0, false, false);
                     
                         if (invite_shit != null) {
                             invite = `${config.use_wss ? 'https' : 'http'}://${config.base_url}${config.local_deploy ? `:${config.port}` : ''}/invite/${invite_shit.code}`;

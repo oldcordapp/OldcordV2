@@ -1463,7 +1463,7 @@ const database: Database = {
             return [];
         }
     },
-    createInvite: async (guild_id: string, channel_id: string, inviter_id: string, temporary: boolean, maxUses: number, maxAge: number, xkcdpass: boolean) => {
+    createInvite: async (guild_id: string, channel_id: string, inviter_id: string, temporary: boolean, maxUses: number, maxAge: number, xkcdpass: boolean, force_regenerate: boolean) => {
         try {
             const guild = await database.getGuildById(guild_id);
 
@@ -1493,20 +1493,41 @@ const database: Database = {
 
             const date = new Date().toISOString();
 
+            if (!force_regenerate) {
+                const existingInvites = await database.runQuery(`SELECT * FROM invites WHERE guild_id = $1 AND channel_id = $2 AND revoked = $3 AND inviter_id = $4 AND maxuses = $5 AND xkcdpass = $6 AND maxage = $7`, [guild_id, channel_id, temporary == true ? 1 : 0, inviter_id, maxUses, xkcdpass == true ? 1 : 0, maxAge]);
+
+                if (existingInvites != null && existingInvites != 'NULL' && existingInvites.length > 0) {
+                    let code = existingInvites[0].code;
+    
+                    const invite = await database.getInvite(code);
+    
+                    if (invite == null) {
+                        return null;
+                    }
+        
+                    return invite;
+                }
+            }
+            
             await database.runQuery(`INSERT INTO invites (guild_id, channel_id, code, temporary, revoked, inviter_id, uses, maxuses, maxage, xkcdpass, createdat) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`, [guild_id, channel_id, code, temporary == true ? 1 : 0, 0, inviter_id, 0, maxUses, maxAge, xkcdpass == true ? 1 : 0, date]);
 
             const invite = await database.getInvite(code);
-
+    
             if (invite == null) {
                 return null;
             }
-
+    
             return invite;
         } catch(error: any) {
             logText(error.toString(), "error");
 
             return null;
         }
+    },
+    quickSetEveryoneOffline: async () => {
+        await database.runQuery(`UPDATE presences SET status = $1, game = $2`, ['offline', null]);
+
+        return true;
     },
     getTutorial: async (user_id: string) => {
         try {
@@ -1515,11 +1536,17 @@ const database: Database = {
             if (tut != null && tut.length > 0) {
                 const indicators: string[] = [];
 
+                console.log(tut[0]);
+
                 if (tut[0].indicators_confirmed != 'NULL' && tut[0].indicators_confirmed.includes(':')) {
                     for(var indicator_confirmed of tut[0].indicators_confirmed.split(':')) {
                         indicators.push(indicator_confirmed)
                     }
+                } else if (tut[0].indicators_confirmed != 'NULL') {
+                    indicators.push(tut[0].indicators_confirmed);
                 }
+
+                console.log(indicators)
 
                 return {
                     indicators_suppressed: tut[0].indicators_suppressed == 1,

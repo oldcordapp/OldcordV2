@@ -58,7 +58,7 @@ interface Database {
     deleteChannel: (channel_id: string) => Promise<boolean>;
     updateChannel: (channel_id: string, channel: Channel) => Promise<boolean>;
     createChannel: (guild_id: string, name: string, type: string) => Promise<Channel | null>;
-    createInvite: (guild_id: string, channel_id: string, inviter_id: string, temporary: boolean, maxUses: number, maxAge: number, xkcdpass: boolean) => Promise<Invite | null>;
+    createInvite: (guild_id: string, channel_id: string, inviter_id: string, temporary: boolean, maxUses: number, maxAge: number, xkcdpass: boolean, force_regenerate: boolean) => Promise<Invite | null>;
     createMessage: (guild_id: string | null, channel_id: string, author_id: string, content: string, nonce: string, attachment: UploadAttachment | null, tts: boolean) => Promise<Message | null>;
     deleteMessage: (message_id: string) => Promise<boolean>;
     updateGuild: (guild_id: string, afk_channel_id: string | null, afk_timeout: number, icon: string | null, name: string, region: string) => Promise<boolean>;
@@ -73,6 +73,7 @@ interface Database {
     createRole: (guild_id: string, name: string, permissions: number, position: number) => Promise<Role | null>;
     addRole: (guild_id: string, role_id: string, user_id: string) => Promise<boolean>;
     createGuild: (owner_id: string, icon: string | null, name: string, region: string | null) => Promise<Guild | null>;
+    quickSetEveryoneOffline: () => Promise<boolean>;
     createAccount: (username: string, email: string, password: string) => Promise<LoginResponse | StandardError>;
     doesThisMatchPassword: (user_id: string, password: string) => Promise<boolean>;
     updateMessage: (message_id: string, new_content: string) => Promise<boolean>;

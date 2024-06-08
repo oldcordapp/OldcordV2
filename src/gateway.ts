@@ -269,7 +269,11 @@ const gateway: Gateway = {
             logText("Client disconnected", "GATEWAY");
         });
 
-        server.on("listening", () => {
+        server.on("listening", async () => {
+            await database.quickSetEveryoneOffline();
+
+            logText("[!] Everyone set to offline for quick temp bug fix [!]", "GATEWAY");
+
             logText("Listening for connections", "GATEWAY")
         });
 

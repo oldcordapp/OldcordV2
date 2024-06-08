@@ -244,6 +244,7 @@ router.post("/:channelid/invites", globalUtils.channelMiddleware, globalUtils.ch
         let max_uses: number = 0;
         let temporary: boolean = false;
         let xkcdpass: boolean = false;
+        let regenerate: boolean = false;
 
         if (req.body.max_age) {
             max_age = req.body.max_age;
@@ -261,7 +262,11 @@ router.post("/:channelid/invites", globalUtils.channelMiddleware, globalUtils.ch
             temporary = req.body.temporary;
         }
 
-        const invite = await database.createInvite(req.params.guildid, req.params.channelid, sender.id, temporary, max_uses, max_age, xkcdpass);
+        if (req.body.regenerate) {
+            regenerate = true;
+        }
+
+        const invite = await database.createInvite(req.params.guildid, req.params.channelid, sender.id, temporary, max_uses, max_age, xkcdpass, regenerate);
 
         if (invite == null) {
             return res.status(500).json({
