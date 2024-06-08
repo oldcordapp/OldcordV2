@@ -217,11 +217,11 @@ router.post("/", upload.single('file'), globalUtils.channelPermissionsMiddleware
                 let size = req.file.size;
     
                 if (!fs.existsSync(`./user_assets/attachments/${channel.id}`)) {
-                    fs.mkdirSync(`./user_assets/attachments/${channel.id}`);
+                    fs.mkdirSync(`./user_assets/attachments/${channel.id}`, { recursive: true });
                 }
     
                 if (!fs.existsSync(`./user_assets/attachments/${channel.id}/${attachment_id}`)) {
-                    fs.mkdirSync(`./user_assets/attachments/${channel.id}/${attachment_id}`);
+                    fs.mkdirSync(`./user_assets/attachments/${channel.id}/${attachment_id}`, { recursive: true });
                 }
     
                 fs.writeFileSync(`./user_assets/attachments/${channel.id}/${attachment_id}/${name}.${extension}`, req.file.buffer);
@@ -299,11 +299,11 @@ router.post("/", upload.single('file'), globalUtils.channelPermissionsMiddleware
                 let size = req.file.size;
     
                 if (!fs.existsSync(`./user_assets/attachments/${channel.id}`)) {
-                    fs.mkdirSync(`./user_assets/attachments/${channel.id}`);
+                    fs.mkdirSync(`./user_assets/attachments/${channel.id}`, { recursive: true });
                 }
     
                 if (!fs.existsSync(`./user_assets/attachments/${channel.id}/${attachment_id}`)) {
-                    fs.mkdirSync(`./user_assets/attachments/${channel.id}/${attachment_id}`);
+                    fs.mkdirSync(`./user_assets/attachments/${channel.id}/${attachment_id}`, { recursive: true });
                 }
     
                 fs.writeFileSync(`./user_assets/attachments/${channel.id}/${attachment_id}/${name}.${extension}`, req.file.buffer);

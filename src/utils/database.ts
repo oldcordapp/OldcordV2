@@ -1890,11 +1890,11 @@ const database: Database = {
                     send_icon = hash.toString();
             
                     if (!fs.existsSync(`user_assets/icons`)) {
-                        fs.mkdirSync(`user_assets/icons`);
+                        fs.mkdirSync(`user_assets/icons`, { recursive: true });
                     }
     
                     if (!fs.existsSync(`user_assets/icons/${guild_id}`)) {
-                        fs.mkdirSync(`user_assets/icons/${guild_id}`);
+                        fs.mkdirSync(`user_assets/icons/${guild_id}`, { recursive: true });
             
                         fs.writeFileSync(`user_assets/icons/${guild_id}/${hash}.${extension}`, imgData, "base64");
                     } else {
@@ -1943,11 +1943,11 @@ const database: Database = {
                 icon = hash.toString();
         
                 if (!fs.existsSync(`user_assets/icons`)) {
-                    fs.mkdirSync(`user_assets/icons`);
+                    fs.mkdirSync(`user_assets/icons`, { recursive: true });
                 }
 
                 if (!fs.existsSync(`user_assets/icons/${id}`)) {
-                    fs.mkdirSync(`user_assets/icons/${id}`);
+                    fs.mkdirSync(`user_assets/icons/${id}`, { recursive: true });
         
                     fs.writeFileSync(`user_assets/icons/${id}/${hash}.${extension}`, imgData, "base64");
                 } else {
@@ -2124,7 +2124,7 @@ const database: Database = {
                 new_avatar = name_hash.toString();
     
                 if (!fs.existsSync(`./user_assets/avatars/${account.id}`)) {
-                    fs.mkdirSync(`./user_assets/avatars/${account.id}`);
+                    fs.mkdirSync(`./user_assets/avatars/${account.id}`, { recursive: true });
                 }
  
                 fs.writeFileSync(`./user_assets/avatars/${account.id}/${name_hash}.${extension}`, imgData, "base64");
