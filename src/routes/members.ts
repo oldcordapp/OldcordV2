@@ -28,6 +28,13 @@ router.delete("/:userid", globalUtils.guildPermissionsMiddleware("KICK_MEMBERS")
             });
         }
 
+        if (sender.id == req.params.userid) {
+            return res.status(403).json({
+                code: 403,
+                message: "Missing Permissions"
+            });
+        }
+
         const member = await database.getGuildMemberById(req.params.guildid, req.params.userid);
 
         if (member == null) {
