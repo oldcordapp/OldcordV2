@@ -23,8 +23,8 @@ import Invite from './interfaces/guild/invite';
 import v6 from './v6/v6'; //experimental
 import * as cookieParser from 'cookie-parser';
 import * as request from 'request';
-import * as wayback from 'wayback-machine';
 import admin from './routes/admin/admin';
+import waybackmachine from './utils/waybackmachine';
 
 const app = express();
 
@@ -61,76 +61,64 @@ app.use('/attachments/', express.static(__dirname + '/user_assets/attachments'))
 
 let cached404s = {};
 
-function convertTimestampToCustomFormat(timestamp) {
-    const dateObject = new Date(timestamp);
-  
-    const year = dateObject.getUTCFullYear();
-    const month = String(dateObject.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(dateObject.getUTCDate()).padStart(2, '0');
-    const hours = String(dateObject.getUTCHours()).padStart(2, '0');
-    const minutes = String(dateObject.getUTCMinutes()).padStart(2, '0');
-    const seconds = String(dateObject.getUTCSeconds()).padStart(2, '0');
-  
-    return `${year}${month}${day}${hours}${minutes}${seconds}`;
-}
-
-app.get("/assets/:asset", (req: Request, res: Response) => {
+app.get("/assets/:asset", async (req: Request, res: Response) => {
     let release = req.cookies['release_date'];
     
     if (!release) {
         release = "september_2_2015"
     }
 
-    if (config.cache404s && cached404s[req.params.asset]) {
+    if (config.cache404s && cached404s[req.params.asset] == 1) {
+        console.log('404');
+
         return res.status(404).send("File not found");
     }
 
     let year = release.includes("2015") ? "2015" : release.includes("2016") ? "2016" : "2017";
 
     if (!fs.existsSync(`${__dirname}/assets/${req.params.asset}`) && !fs.existsSync(`${__dirname}/assets/${year}/${req.params.asset}`)) {
-        wayback.getTimeline(`https://discordapp.com/assets/${req.params.asset}`, function(err, timeline) {
+        console.log(`https://discordapp.com/assets/${req.params.asset}`);
+
+        let timestamps = await waybackmachine.getTimestamps(`https://discordapp.com/assets/${req.params.asset}`);
+
+        if (timestamps == null || timestamps.first_ts.includes("1999")) {
+            cached404s[req.params.asset] = 1;
+
+            return res.status(404).send("File not found");
+        }
+
+        console.log(timestamps.first_ts);
+
+        let timestamp = timestamps.first_ts;
+
+        let snapshot_url = `https://web.archive.org/web/${timestamp}im_/https://discordapp.com/assets/${req.params.asset}`;
+
+        request(snapshot_url, { encoding: null }, (err, resp, body) => {
             if (err) {
                 cached404s[req.params.asset] = 1;
 
                 return res.status(404).send("File not found");
             }
 
-            if (timeline.original == null && timeline.timegate == null && timeline.first == null && timeline.last == null && timeline.mementos.length == 0) {
-                cached404s[req.params.asset] = 1;
+            if (snapshot_url.endsWith(".js")) {
+                let str = Buffer.from(body).toString("utf-8");
 
-                return res.status(404).send("File not found");
+                str = str.replace("cdn.discordapp.com", (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
+                str = str.replace("discord.gg", (config.local_deploy ? config.base_url + ":" + config.port : config.base_url) + "/invites");
+                str = str.replace("d3dsisomax34re.cloudfront.net", (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
+                str = str.replace(/discordapp.com/g, (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
+
+                body = Buffer.from(str);
+
+                fs.writeFileSync(`./assets/${year}/${req.params.asset}`, str, "utf-8");
+            } else {
+                fs.writeFileSync(`./assets/${year}/${req.params.asset}`, body);
             }
-        
-            let timestamp = convertTimestampToCustomFormat(timeline.first.time);
-            let snapshot_url = `https://web.archive.org/web/${timestamp}im_/https://discordapp.com/assets/${req.params.asset}`;
 
-            request(snapshot_url, { encoding: null }, (err, resp, body) => {
-                if (err) {
-                    cached404s[req.params.asset] = 1;
+            console.log(`[LOG] Saved ${req.params.asset} from ${snapshot_url} successfully.`);
 
-                    return res.status(404).send("File not found");
-                }
-
-                if (snapshot_url.endsWith(".js")) {
-                    let str = Buffer.from(body).toString("utf-8");
-
-                    str = str.replace("cdn.discordapp.com", (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
-                    str = str.replace("discord.gg", (config.local_deploy ? config.base_url + ":" + config.port : config.base_url) + "/invites");
-                    str = str.replace("d3dsisomax34re.cloudfront.net", (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
-                    str = str.replace(/discordapp.com/g, (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
-
-                    body = Buffer.from(str);
-
-                    fs.writeFileSync(`./assets/${year}/${req.params.asset}`, str, "utf-8");
-                } else {
-                    fs.writeFileSync(`./assets/${year}/${req.params.asset}`, body);
-                }
-
-                console.log(`[LOG] Saved ${req.params.asset} from ${snapshot_url} successfully.`);
-
-                res.writeHead(resp.statusCode, { "Content-Type": resp.headers["content-type"] })
-                res.status(resp.statusCode).end(body);
-            });
+            res.writeHead(resp.statusCode, { "Content-Type": resp.headers["content-type"] })
+            res.status(resp.statusCode).end(body);
         });
     }
 });
