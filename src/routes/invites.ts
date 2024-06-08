@@ -166,6 +166,12 @@ router.post("/:code", globalUtils.instanceMiddleware("NO_INVITE_USE"), async (re
     delete invite.max_age;
     delete invite.xkcdpass;
 
+    const member = await database.getGuildMemberById(invite.guild.id, sender.id);
+
+    if (member != null) {
+      return res.status(200).send(invite);
+    }
+
     const client = await gateway.clients.filter(x => x.token == token)[0];
 
     if (client == null) {
