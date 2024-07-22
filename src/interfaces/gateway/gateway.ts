@@ -1,6 +1,5 @@
 import Client from './client'
 import { WebSocket } from "ws";
-import ExtWebSocket from './extwebsocket';
 
 interface Gateway {
     server: any;
@@ -8,9 +7,9 @@ interface Gateway {
     clients: Client[];
     ready: (server: any) => void;
     regularReady: (port: any) => void;
-    getSocket: (token: string) => ExtWebSocket | null;
+    getSocket: (token: string) => WebSocket | null;
     handleEvents: () => void;
-    send: (socket: ExtWebSocket, data: any) => void;
+    send: (socket: WebSocket, data: any) => void;
     dispatchEventToAll: (data: any) => boolean;
     dispatchEventTo: (token: string, data: any) => boolean;
     dispatchEventToPerms: (token: string, guild_id: string, channel_id: string | null, permission_check: string, data: any) => Promise<boolean>;

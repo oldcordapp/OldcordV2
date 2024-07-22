@@ -4,7 +4,7 @@ import { logText } from "./utils/logger";
 import database from "./utils/database";
 import globalUtils from "./utils/global";
 import Channel from "./interfaces/guild/channel";
-import ExtWebSocket from "./interfaces/gateway/extwebsocket"
+import Client from "./interfaces/gateway/client";
 
 const gateway: Gateway = {
     server: null,
@@ -253,63 +253,79 @@ const gateway: Gateway = {
     },
     handleEvents: () => {
         const server: WebSocket.Server = gateway.server as WebSocket.Server;
-
-        server.on('close', async () => {
-            for(var client of gateway.clients) {
-                let user = client.user;
-
-                if (user != null) {
-                    await globalUtils.dispatchPresenceUpdate(user.id, "offline", null);
-    
-                    await database.updatePresence(user.id, "offline", null);
-        
-                    logText("Global disconnection", "GATEWAY");
-    
-                    gateway.clients = [];
-                }
-            }
-        });
+        const timeOutHandlers: any[] = [];
 
         server.on("listening", async () => {
-            await database.quickSetEveryoneOffline();
-
-            logText("[!] Everyone set to offline for quick temp bug fix [!]", "GATEWAY");
-
             logText("Listening for connections", "GATEWAY")
         });
 
-        server.on("connection", (socket: ExtWebSocket) => {
+        server.on("connection", (socket: WebSocket) => {
             const HBINTERVAL = 45000;
             const HBTIMEOUT = HBINTERVAL + 20000;
             const HBEXTRA = HBINTERVAL - 30000;
 
             logText("New client connection", "GATEWAY")
 
-            function resetHB() {
-                socket.hbTimeout = setTimeout(() => {
+            timeOutHandlers.push({
+                hbTimeout: setTimeout(() => {}, HBINTERVAL + 99999),
+                socket: socket
+            })
+
+            function resetHB(handler_passed: null | any) {
+                let handler: any;
+
+                if (handler_passed != null) handler = handler_passed;
+                else handler = timeOutHandlers.filter(x => x.socket == socket)[0];
+
+                if (handler == null) {
+                    return;
+                }
+
+                handler.hbTimeout = setTimeout(() => {
                     socket.send(JSON.stringify({
                         op: 1,
                         d: null
                     }));
 
-                    socket.hbTimeout = setTimeout(() => socket.close(4009, 'Session timed out'), HBEXTRA);
+                    let cur_socket = gateway.clients.filter(x => x.socket == socket)[0];
+
+                    if (cur_socket != null && cur_socket.user) {
+                        logText(`Acknowledged client heartbeat from ${cur_socket.user.id} (${cur_socket.user.username}#${cur_socket.user.discriminator})`, "GATEWAY");
+                    } 
+
+                    handler.hbTimeout = setTimeout(async () => {
+                        if (cur_socket.user != null) {
+                            await globalUtils.dispatchPresenceUpdate(cur_socket.user.id, "offline", null);
+                        }
+
+                        socket.close(4009, 'Session timed out');
+
+                        gateway.clients = gateway.clients.filter(client => client.socket !== socket);
+                    }, HBEXTRA);
                 }, HBTIMEOUT);
             }
 
-            resetHB();
+            resetHB(null);
 
             socket.on("close", async () => {
-                if (socket.user != null) {
-                    await globalUtils.dispatchPresenceUpdate(socket.user.id, "offline", null);
-                    await database.updatePresence(socket.user.id, "offline", null);
-        
-                    logText(`Client ${socket.user.id} disconnected`, "GATEWAY");
+                let handler = timeOutHandlers.filter(x => x.socket == socket)[0];
+
+                if (handler == null) {
+                    return;
+                }
+
+                let cur_socket = gateway.clients.filter(x => x.socket == socket)[0];
+
+                if (cur_socket.user != null) {
+                    await globalUtils.dispatchPresenceUpdate(cur_socket.user.id, "offline", null);
+
+                    logText(`Client ${cur_socket.user.id} disconnected`, "GATEWAY");
         
                     gateway.clients = gateway.clients.filter(client => client.socket !== socket);
                 }
         
-                if (socket.hbTimeout) {
-                    clearTimeout(socket.hbTimeout);
+                if (handler.hbTimeout) {
+                    clearTimeout(handler.hbTimeout);
                 }
             });
 
@@ -332,6 +348,8 @@ const gateway: Gateway = {
                         const existingConnection = await gateway.clients.filter(x => x.user.id == user?.id)[0];
 
                         if (existingConnection) {
+                            await globalUtils.dispatchPresenceUpdate(existingConnection.user.id, "offline", null);
+
                             existingConnection.socket.close(4008, 'New connection has been established. This one is no longer needed.');
 
                             gateway.clients = gateway.clients.filter(client => client.socket !== existingConnection.socket);
@@ -350,16 +368,28 @@ const gateway: Gateway = {
                             token: packet.d.token,
                             sequence: 0,
                             socket: socket,
-                            user: user
+                            user: user,
+                            presence: {
+                                game: null,
+                                status: 'online',
+                                user: {
+                                    avatar: user.avatar,
+                                    discriminator: user.discriminator,
+                                    id: user.id,
+                                    username: user.username
+                                }
+                            }
                         });
 
-                        const client = await gateway.clients.filter(x => x.user.id == user?.id)[0];
+                        console.log("1");
+
+                        const client = gateway.clients.filter(x => x.user.id == user?.id)[0];
 
                         await globalUtils.dispatchPresenceUpdate(user.id, "online", null)
 
-                        await database.updatePresence(user.id, "online", null);
-
                         const guilds = await database.getUsersGuilds(user.id);
+
+                        console.log("2");
 
                         let presences: any[] = [];
 
@@ -403,10 +433,7 @@ const gateway: Gateway = {
                             }
                         }
 
-                        if (socket.sequence) {
-                            client.sequence++;
-                            socket.sequence++;
-                        }
+                        client.sequence++;
 
                         let tutorial = await database.getTutorial(user.id);
 
@@ -442,32 +469,59 @@ const gateway: Gateway = {
                         });
                     break;
                     case 1:
-                        clearTimeout(socket.hbTimeout);
+                        let handler2 = timeOutHandlers.filter(x => x.socket == socket)[0];
 
-                        resetHB();
-
-                        //socket.send(JSON.stringify({
-                            //op: 11,
-                            //d: packet.d
-                        //}));
-
-                        if (socket.user != null) {
-                            logText(`Acknowledged client heartbeat from ${socket.user.id} (${socket.user.username}#${socket.user.discriminator})`, "GATEWAY");
+                        if (handler2 == null) {
+                            return;
                         }
+
+                        clearTimeout(handler2.hbTimeout);
+
+                        resetHB(handler2);
                     break;
                     case 3:
-                        let pUser = socket.user;
+                        let cur_socket = gateway.clients.filter(x => x.socket == socket)[0];
 
-                        if (pUser != null && packet.d.idle_since == null && packet.d.game_id == null) {
-                            await globalUtils.dispatchPresenceUpdate(pUser.id, "online", null)
+                        if (cur_socket != null && cur_socket.user) {
+                            let pUser = cur_socket.user;
 
-                            await database.updatePresence(pUser.id, "online", null);
-                        }
-                        else if (pUser != null) {
-                            await globalUtils.dispatchPresenceUpdate(pUser.id, "idle", null)
-
-                            await database.updatePresence(pUser.id, "idle", null);
-                        }
+                            if (pUser != null && packet.d.idle_since == null && packet.d.game_id == null) {
+                                await globalUtils.dispatchPresenceUpdate(pUser.id, "online", null);
+    
+                                let client = gateway.clients.filter(x => x.socket == socket)[0];
+    
+                                if (client != null) {
+                                    client.presence = {
+                                        game: null,
+                                        status: 'online',
+                                        user: {
+                                            avatar: pUser.avatar,
+                                            discriminator: pUser.discriminator,
+                                            id: pUser.id,
+                                            username: pUser.username
+                                        }
+                                    }
+                                }
+                            }
+                            else if (pUser != null) {
+                                await globalUtils.dispatchPresenceUpdate(pUser.id, "idle", null);
+    
+                                let client = gateway.clients.filter(x => x.socket == socket)[0];
+    
+                                if (client != null) {
+                                    client.presence = {
+                                        game: null,
+                                        status: 'idle',
+                                        user: {
+                                            avatar: pUser.avatar,
+                                            discriminator: pUser.discriminator,
+                                            id: pUser.id,
+                                            username: pUser.username
+                                        }
+                                    }
+                                }
+                            }
+                        } 
                     break;
                     case 4:
                         let guildId = packet.d.guild_id;

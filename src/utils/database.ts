@@ -7,7 +7,7 @@ import Database from '../interfaces/database';
 import Guild from '../interfaces/guild';
 import Ban from '../interfaces/guild/ban';
 import * as fs from 'fs'
-import * as md5 from 'md5'
+import * as md5 from 'md5';
 import Channel from '../interfaces/guild/channel';
 import Member from '../interfaces/guild/member';
 import Role from '../interfaces/guild/role';
@@ -20,13 +20,14 @@ import Attachment from '../interfaces/guild/attachment';
 import Permission_Overwrite from '../interfaces/guild/permission_overwrite';
 import Invite from '../interfaces/guild/invite';
 import config from './config';
+import gateway from '../gateway';
 
 const configuration = {
     host: 'localhost',
     port: 5433,
-    database: 'db_database',
+    database: 'db_here',
     user: 'postgres',
-    password: 'db_password'
+    password: 'pw_here'
 }
 
 const pool = new Pool(configuration);
@@ -76,6 +77,7 @@ const database: Database = {
                 settings TEXT DEFAULT 'INLINE_EMBED_MEDIA:1,INLINE_ATTACHMENT_MEDIA:1,RENDER_EMBEDS:1,ENABLE_TTS_COMMAND:1,THEME:DARK'
             );`, []);
 
+            /*
             await database.runQuery(`
             CREATE TABLE IF NOT EXISTS presences (
                 user_id TEXT,
@@ -83,6 +85,7 @@ const database: Database = {
                 game TEXT DEFAULT NULL,
                 status TEXT DEFAULT 'offline'
             );`, []);
+            */ //why was this needed? all the presences can be handled at runtime, why do they need to be stored - good question for past me
 
             await database.runQuery(`
             CREATE TABLE IF NOT EXISTS channels (
@@ -592,80 +595,34 @@ const database: Database = {
             return [];
         }
     },
-    quickSetEveryoneOffline: async () => {
-        try {
-            /*
-            const rows = await database.runQuery(`SELECT * FROM presences`, []);
-
-            if (rows != null && rows.length > 0) {
-                for(var row of rows) {
-                    const guilds: Guild[] = await database.getUsersGuilds(row.user_id);
-
-                    if (guilds != null && guilds.length > 0) {
-                        for(var guild of guilds) {
-                            const guildPresences: Presence[] = await database.getGuildPresences(guild.id)
-
-                            if (guildPresences.length > 0) {
-                                if (guildPresences.filter(x => x.user?.id == row.user_id).length == 0) {
-                                    await database.runQuery(`INSERT INTO presences (user_id, game, status, guild_id) VALUES ($1, $2, $3, $4)`, [row.user_id, 'NULL', 'online', guild.id]);
-                                }
-                            } else {
-                                //do-all
-
-                                const membersOfGuild: Member[] = await database.getGuildMembers(guild.id);
-
-                                if (membersOfGuild.length > 0) {
-                                    for(var member of membersOfGuild) {
-                                        await database.runQuery(`INSERT INTO presences (user_id, game, status, guild_id) VALUES ($1, $2, $3, $4)`, [member.id, 'NULL', 'online', guild.id]);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            */ //jank quick fix DO NOT uncomment this after running it once - if needed.
-
-            await database.runQuery(`UPDATE presences SET status = $1, game = $2`, ['offline', null]);
-
-            return true;
-        }
-        catch(error: any) {
-            logText(error.toString(), "error");
-
-            return false;
-        }
-    },
     getGuildPresences: async (id: string) => {
         try {
-            const rows = await database.runQuery(`
-                SELECT * FROM presences WHERE guild_id = $1
-            `, [id]);
+            const guildMembers = await database.getGuildMembers(id);
 
-            if (rows != null && rows.length > 0) {
-                const ret: Presence[] = [];
-
-                for(var row of rows) {
-                    const user = await database.getAccountByUserId(row.user_id);
-                    
-                    if (user != null) {
-                        delete user.email;
-                        delete user.password;
-                        delete user.token;
-                        delete user.settings;
-
-                        ret.push({
-                            user: user,
-                            game: row.game == 'NULL' ? null : row.game,
-                            status: row.status
-                        })
-                    }
-                }
-
-                return ret;
-            } else {
+            if (guildMembers == null || guildMembers.length == 0) {
                 return [];
             }
+
+            const ret: Presence[] = [];
+
+            for(var member of guildMembers) {
+                const client = gateway.clients.filter(x => x.user.id == member.id)[0];
+
+                if (client == null || !client.presence) {
+                    ret.push({                             
+                        game: null,
+                        status: 'offline',
+                        user: {
+                            avatar: member.user.avatar,
+                            discriminator: member.user.discriminator,
+                            id: member.user.id,
+                            username: member.user.username
+                        }
+                    });
+                } else ret.push(client.presence);
+            }
+
+            return ret;
         } catch (error: any) {
             logText(error.toString(), "error");
 
@@ -749,6 +706,8 @@ const database: Database = {
                         delete user.password;
                         delete user.token;
                         delete user.settings;
+                        delete user.verified;
+                        delete user.created_at;
 
                         ret.push({
                             id: row.user_id,
@@ -1046,6 +1005,8 @@ const database: Database = {
                 SELECT * FROM guilds WHERE id = $1
             `, [id]);
 
+            console.log("GETTING GUILD");
+
             if (rows == null || rows.length == 0) {
                 return null;
             }
@@ -1068,7 +1029,10 @@ const database: Database = {
                 return null;
             }
 
+            //let presences: any[] = [];
             let presences: Presence[] = await database.getGuildPresences(id);
+
+            console.log(JSON.stringify(presences));
             let fixed_presences: any[] = []
 
             if (presences.length > 0) {
@@ -1440,7 +1404,7 @@ const database: Database = {
 
             await database.runQuery(`INSERT INTO members (guild_id, user_id, nick, roles, joined_at, deaf, mute) VALUES ($1, $2, $3, $4, $5, $6, $7)`, [guild_id, user_id, 'NULL', everyone_role.id, date, 0, 0]);
 
-            await database.runQuery(`INSERT INTO presences (user_id, game, status, guild_id) VALUES ($1, $2, $3, $4)`, [user.id, 'NULL', 'online', guild.id]);
+            //await database.runQuery(`INSERT INTO presences (user_id, game, status, guild_id) VALUES ($1, $2, $3, $4)`, [user.id, 'NULL', 'online', guild.id]);
 
             return true;
         } catch(error: any) {
@@ -1786,19 +1750,6 @@ const database: Database = {
             return false;
         }
     },
-    updatePresence: async (user_id: string, new_status: string, game: any | null) => {
-        try {
-            await database.runQuery(`
-                UPDATE presences SET status = $1, game = $2 WHERE user_id = $3
-            `, [new_status, game, user_id]);
-
-            return true;
-        } catch(error: any) {
-            logText(error.toString(), "error");
-
-            return false;
-        }
-    },
     leaveGuild: async (user_id: string, guild_id: string) => {
         try {
             await database.runQuery(`DELETE FROM members WHERE guild_id = $1 AND user_id = $2`, [guild_id, user_id]);
@@ -2026,7 +1977,7 @@ const database: Database = {
 
             await database.runQuery(`INSERT INTO guilds (id, name, icon, region, owner_id, afk_channel_id, afk_timeout, creation_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, [id, name, (icon == null ? 'NULL' : icon), (region == null ? "sydney" : region), owner_id, 'NULL', 300, date])
             await database.runQuery(`INSERT INTO channels (id, type, guild_id, topic, last_message_id, recipient_id, is_private, permission_overwrites, name, position) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, [id, 'text', id, 'NULL', '0', 'NULL', 0, 'NULL', 'general', 0])
-            await database.runQuery(`INSERT INTO presences (user_id, game, status, guild_id) VALUES ($1, $2, $3, $4)`, [owner_id, 'NULL', 'online', id]);
+            //await database.runQuery(`INSERT INTO presences (user_id, game, status, guild_id) VALUES ($1, $2, $3, $4)`, [owner_id, 'NULL', 'online', id]);
             await database.runQuery(`INSERT INTO roles (guild_id, role_id, name, permissions, position) VALUES ($1, $2, $3, $4, $5)`, [id, id, '@everyone', 104193089, 0]); 
             await database.runQuery(`INSERT INTO members (guild_id, user_id, nick, roles, joined_at, deaf, mute) VALUES ($1, $2, $3, $4, $5, $6, $7)`, [id, owner_id, 'NULL', id, date, 0, 0]);
             await database.runQuery(`INSERT INTO widgets (guild_id, channel_id, enabled) VALUES ($1, $2, $3)`, [id, 'NULL', 0]);
@@ -2110,7 +2061,7 @@ const database: Database = {
             let token = globalUtils.generateToken(id, pwHash);
 
             await database.runQuery(`INSERT INTO users (id,username,discriminator,email,password,token,created_at,avatar,settings) VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, $8)`, [id, username, discriminator.toString(), email, pwHash, token, date, 'INLINE_EMBED_MEDIA:1,INLINE_ATTACHMENT_MEDIA:1,RENDER_EMBEDS:1,ENABLE_TTS_COMMAND:1,THEME:DARK'])
-            await database.runQuery(`INSERT INTO presences (user_id, game, status, guild_id) VALUES ($1, NULL, 'online', 'NULL')`, [id]);
+            //await database.runQuery(`INSERT INTO presences (user_id, game, status, guild_id) VALUES ($1, NULL, 'online', 'NULL')`, [id]);
             await database.runQuery(`INSERT INTO tutorial (user_id, indicators_suppressed, indicators_confirmed) VALUES ($1, 0, 'NULL')`, [id]);
 
             return {

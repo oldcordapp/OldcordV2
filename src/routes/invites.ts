@@ -166,7 +166,7 @@ router.post("/:code", globalUtils.instanceMiddleware("NO_INVITE_USE"), async (re
     delete invite.max_age;
     delete invite.xkcdpass;
 
-    const client = await gateway.clients.filter(x => x.token == token)[0];
+    const client = gateway.clients.filter(x => x.token == token)[0];
 
     if (client == null) {
       return res.status(500).json({

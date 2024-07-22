@@ -37,7 +37,7 @@ router.delete("/:userid", globalUtils.guildPermissionsMiddleware("KICK_MEMBERS")
             });
         }
 
-        const client = await gateway.clients.filter(x => x.user.id == member.id)[0];
+        const client = gateway.clients.filter(x => x.user.id == member.id)[0];
 
         const attempt = await database.leaveGuild(member.id, req.params.guildid);
 

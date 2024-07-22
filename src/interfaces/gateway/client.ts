@@ -1,12 +1,13 @@
 import User from "../user";
 import { WebSocket } from "ws";
-import ExtWebSocket from "./extwebsocket";
+import Presence from "../presence";
 
 interface Client {
     token: string;
-    socket: ExtWebSocket;
+    socket: WebSocket;
     user: User;
-    sequence: 0;
+    sequence: number;
+    presence: Presence;
 }
 
 export default Client;

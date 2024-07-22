@@ -51,7 +51,7 @@ router.post("/", globalUtils.instanceMiddleware("NO_GUILD_CREATION"), async (req
                 message: "Internal Server Error"
             });
         } else {
-            const client = await gateway.clients.filter(x => x.token == token)[0];
+            const client = gateway.clients.filter(x => x.token == token)[0];
 
             if (client == null) {
                 return res.status(500).json({
@@ -131,7 +131,7 @@ router.delete("/:guildid", globalUtils.guildMiddleware, async (req: Request, res
 
             return res.status(204).send();
         } else {
-            const client = await gateway.clients.filter(x => x.token == token)[0];
+            const client = gateway.clients.filter(x => x.token == token)[0];
 
             if (client == null) {
                 return res.status(500).json({
@@ -171,7 +171,7 @@ router.delete("/:guildid", globalUtils.guildMiddleware, async (req: Request, res
                         discriminator: user.discriminator,
                         id: user.id,
                         avatar: user.avatar
-                  },
+                    },
                   guild_id: req.params.guildid
                 }
             });
