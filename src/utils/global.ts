@@ -193,18 +193,18 @@ const globalUtils = {
             const token = req.headers['authorization'];
     
             if (!token) {
-                return res.status(500).json({
-                    code: 500,
-                    message: "Internal Server Error"
+                return res.status(401).json({
+                    code: 401,
+                    message: "Unauthorized"
                 });
             }
 
             const sender = await database.getAccountByToken(token);
 
             if (sender == null) {
-                return res.status(500).json({
-                    code: 500,
-                    message: "Internal Server Error"
+                return res.status(401).json({
+                    code: 401,
+                    message: "Unauthorized"
                 });
             }
 
@@ -215,9 +215,9 @@ const globalUtils = {
             const guild = await database.getGuildById(req.params.guildid);
 
             if (guild == null) {
-                return res.status(500).json({
-                    code: 500,
-                    message: "Internal Server Error"
+                return res.status(404).json({
+                    code: 404,
+                    message: "Unknown Guild"
                 });
             }
 

@@ -86,18 +86,18 @@ router.delete("/:guildid", globalUtils.guildMiddleware, async (req: Request, res
         const token = req.headers['authorization'];
     
         if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
+            return res.status(401).json({
+                code: 401,
+                message: "Unauthorized"
             });
         }
 
         const user = await database.getAccountByToken(token);
 
         if (user == null) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
+            return res.status(401).json({
+                code: 401,
+                message: "Unauthorized"
             });
         }
 
@@ -165,11 +165,12 @@ router.delete("/:guildid", globalUtils.guildMiddleware, async (req: Request, res
                 t: "GUILD_MEMBER_REMOVE",
                 s: null,
                 d: {
-                  user: {
-                    username: user.username,
-                    discriminator: user.discriminator,
-                    id: user.id,
-                    avatar: user.avatar
+                    roles: [],
+                    user: {
+                        username: user.username,
+                        discriminator: user.discriminator,
+                        id: user.id,
+                        avatar: user.avatar
                   },
                   guild_id: req.params.guildid
                 }

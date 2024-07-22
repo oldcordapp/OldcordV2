@@ -34,8 +34,6 @@ router.get("/", async (req: Request, res: Response) => {
         })
     }
 
-    console.log(tutorial);
-
     return res.status(200).json(tutorial);
   } catch (error: any) {
     logText(error.toString(), "error");

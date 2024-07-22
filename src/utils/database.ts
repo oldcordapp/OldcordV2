@@ -24,9 +24,9 @@ import config from './config';
 const configuration = {
     host: 'localhost',
     port: 5433,
-    database: 'oldcord_2015',
+    database: 'db_database',
     user: 'postgres',
-    password: 'passwordhere'
+    password: 'db_password'
 }
 
 const pool = new Pool(configuration);
@@ -592,6 +592,50 @@ const database: Database = {
             return [];
         }
     },
+    quickSetEveryoneOffline: async () => {
+        try {
+            /*
+            const rows = await database.runQuery(`SELECT * FROM presences`, []);
+
+            if (rows != null && rows.length > 0) {
+                for(var row of rows) {
+                    const guilds: Guild[] = await database.getUsersGuilds(row.user_id);
+
+                    if (guilds != null && guilds.length > 0) {
+                        for(var guild of guilds) {
+                            const guildPresences: Presence[] = await database.getGuildPresences(guild.id)
+
+                            if (guildPresences.length > 0) {
+                                if (guildPresences.filter(x => x.user?.id == row.user_id).length == 0) {
+                                    await database.runQuery(`INSERT INTO presences (user_id, game, status, guild_id) VALUES ($1, $2, $3, $4)`, [row.user_id, 'NULL', 'online', guild.id]);
+                                }
+                            } else {
+                                //do-all
+
+                                const membersOfGuild: Member[] = await database.getGuildMembers(guild.id);
+
+                                if (membersOfGuild.length > 0) {
+                                    for(var member of membersOfGuild) {
+                                        await database.runQuery(`INSERT INTO presences (user_id, game, status, guild_id) VALUES ($1, $2, $3, $4)`, [member.id, 'NULL', 'online', guild.id]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            */ //jank quick fix DO NOT uncomment this after running it once - if needed.
+
+            await database.runQuery(`UPDATE presences SET status = $1, game = $2`, ['offline', null]);
+
+            return true;
+        }
+        catch(error: any) {
+            logText(error.toString(), "error");
+
+            return false;
+        }
+    },
     getGuildPresences: async (id: string) => {
         try {
             const rows = await database.runQuery(`
@@ -800,6 +844,13 @@ const database: Database = {
                 return null;
             }
 
+            delete member.user.created_at;
+            delete member.user.email;
+            delete member.user.password;
+            delete member.user.settings;
+            delete member.user.token;
+            delete member.user.verified; // just in case
+
             return member;
         } catch (error: any) {
             logText(error.toString(), "error");
@@ -845,7 +896,7 @@ const database: Database = {
                 }
             }
 
-            if (mentions.length > 0) {
+            if (mention_ids.length > 0) {
                 for(var mention_id of mention_ids) {
                     const mention = await database.getAccountByUserId(mention_id);
 
@@ -1389,6 +1440,8 @@ const database: Database = {
 
             await database.runQuery(`INSERT INTO members (guild_id, user_id, nick, roles, joined_at, deaf, mute) VALUES ($1, $2, $3, $4, $5, $6, $7)`, [guild_id, user_id, 'NULL', everyone_role.id, date, 0, 0]);
 
+            await database.runQuery(`INSERT INTO presences (user_id, game, status, guild_id) VALUES ($1, $2, $3, $4)`, [user.id, 'NULL', 'online', guild.id]);
+
             return true;
         } catch(error: any) {
             logText(error.toString(), "error");
@@ -1524,11 +1577,6 @@ const database: Database = {
             return null;
         }
     },
-    quickSetEveryoneOffline: async () => {
-        await database.runQuery(`UPDATE presences SET status = $1, game = $2`, ['offline', null]);
-
-        return true;
-    },
     getTutorial: async (user_id: string) => {
         try {
             const tut = await database.runQuery(`SELECT * FROM tutorial WHERE user_id = $1`, [user_id]);
@@ -1536,17 +1584,11 @@ const database: Database = {
             if (tut != null && tut.length > 0) {
                 const indicators: string[] = [];
 
-                console.log(tut[0]);
-
                 if (tut[0].indicators_confirmed != 'NULL' && tut[0].indicators_confirmed.includes(':')) {
                     for(var indicator_confirmed of tut[0].indicators_confirmed.split(':')) {
                         indicators.push(indicator_confirmed)
                     }
-                } else if (tut[0].indicators_confirmed != 'NULL') {
-                    indicators.push(tut[0].indicators_confirmed);
                 }
-
-                console.log(indicators)
 
                 return {
                     indicators_suppressed: tut[0].indicators_suppressed == 1,

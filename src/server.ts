@@ -23,8 +23,8 @@ import Invite from './interfaces/guild/invite';
 import v6 from './v6/v6'; //experimental
 import * as cookieParser from 'cookie-parser';
 import * as request from 'request';
-import admin from './routes/admin/admin';
 import waybackmachine from './utils/waybackmachine';
+import admin from './routes/admin/admin';
 
 const app = express();
 
@@ -61,6 +61,19 @@ app.use('/attachments/', express.static(__dirname + '/user_assets/attachments'))
 
 let cached404s = {};
 
+function convertTimestampToCustomFormat(timestamp) {
+    const dateObject = new Date(timestamp);
+  
+    const year = dateObject.getUTCFullYear();
+    const month = String(dateObject.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(dateObject.getUTCDate()).padStart(2, '0');
+    const hours = String(dateObject.getUTCHours()).padStart(2, '0');
+    const minutes = String(dateObject.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(dateObject.getUTCSeconds()).padStart(2, '0');
+  
+    return `${year}${month}${day}${hours}${minutes}${seconds}`;
+}
+
 app.get("/assets/:asset", async (req: Request, res: Response) => {
     let release = req.cookies['release_date'];
     
@@ -90,9 +103,13 @@ app.get("/assets/:asset", async (req: Request, res: Response) => {
         let timestamps = await waybackmachine.getTimestamps(`https://discordapp.com/assets/${req.params.asset}`);
 
         if (timestamps == null || timestamps.first_ts.includes("1999")) {
-            cached404s[req.params.asset] = 1;
+            timestamps = await waybackmachine.getTimestamps(`https://d3dsisomax34re.cloudfront.net/assets/${req.params.asset}`);
 
-            return res.status(404).send("File not found");
+            if (timestamps == null || timestamps.first_ts.includes("1999")) {
+                cached404s[req.params.asset] = 1;
+
+                return res.status(404).send("File not found");
+            }
         }
 
         console.log(timestamps.first_ts);
@@ -132,6 +149,7 @@ app.get("/assets/:asset", async (req: Request, res: Response) => {
         });
     }
 });
+
 
 //app.use("/api/v6", v6);
 app.use("/api/auth", auth);

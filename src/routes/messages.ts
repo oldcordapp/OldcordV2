@@ -197,6 +197,24 @@ router.post("/", upload.single('file'), globalUtils.channelPermissionsMiddleware
             });
         }
 
+        let finalContent: String = req.body.content;
+
+        if (req.body.mentions) {
+            const mentions: string[] = req.body.mentions;
+            
+            if (mentions != null && mentions.length > 0) {
+                for(let mention of mentions) {
+                    const user = await database.getAccountByUserId(mention);
+
+                    if (user != null && user.token) {
+                        finalContent = finalContent.replace(`@${user.username}`, `<@${user.id}>`);
+                    }
+                }
+            }
+        }
+
+        req.body.content = finalContent;
+
         if (channel.recipient != null) {
             const recipient = await database.getAccountByUserId(channel.recipient.id);
 
@@ -371,18 +389,18 @@ router.delete("/:messageid", globalUtils.channelPermissionsMiddleware("MANAGE_ME
         const token = req.headers['authorization'];
     
         if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
+            return res.status(401).json({
+                code: 401,
+                message: "Unauthorized"
             });
         }
         
         const guy = await database.getAccountByToken(token);
 
         if (guy == null) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
+            return res.status(401).json({
+                code: 401,
+                message: "Unauthorized"
             });
         }
 

@@ -4,6 +4,7 @@ import { logText } from "./utils/logger";
 import database from "./utils/database";
 import globalUtils from "./utils/global";
 import Channel from "./interfaces/guild/channel";
+import ExtWebSocket from "./interfaces/gateway/extwebsocket"
 
 const gateway: Gateway = {
     server: null,
@@ -253,20 +254,20 @@ const gateway: Gateway = {
     handleEvents: () => {
         const server: WebSocket.Server = gateway.server as WebSocket.Server;
 
-        server.on('close', async (socket: WebSocket) => {
-            let user2 = gateway.clients.filter(x => x.socket == socket)[0]
+        server.on('close', async () => {
+            for(var client of gateway.clients) {
+                let user = client.user;
 
-            if (user2 == null) {
-                return;
+                if (user != null) {
+                    await globalUtils.dispatchPresenceUpdate(user.id, "offline", null);
+    
+                    await database.updatePresence(user.id, "offline", null);
+        
+                    logText("Global disconnection", "GATEWAY");
+    
+                    gateway.clients = [];
+                }
             }
-
-            let user = user2.user;
-
-            await globalUtils.dispatchPresenceUpdate(user.id, "offline", null);
-
-            await database.updatePresence(user.id, "offline", null);
-
-            logText("Client disconnected", "GATEWAY");
         });
 
         server.on("listening", async () => {
@@ -277,8 +278,40 @@ const gateway: Gateway = {
             logText("Listening for connections", "GATEWAY")
         });
 
-        server.on("connection", (socket: WebSocket) => {
+        server.on("connection", (socket: ExtWebSocket) => {
+            const HBINTERVAL = 45000;
+            const HBTIMEOUT = HBINTERVAL + 20000;
+            const HBEXTRA = HBINTERVAL - 30000;
+
             logText("New client connection", "GATEWAY")
+
+            function resetHB() {
+                socket.hbTimeout = setTimeout(() => {
+                    socket.send(JSON.stringify({
+                        op: 1,
+                        d: null
+                    }));
+
+                    socket.hbTimeout = setTimeout(() => socket.close(4009, 'Session timed out'), HBEXTRA);
+                }, HBTIMEOUT);
+            }
+
+            resetHB();
+
+            socket.on("close", async () => {
+                if (socket.user != null) {
+                    await globalUtils.dispatchPresenceUpdate(socket.user.id, "offline", null);
+                    await database.updatePresence(socket.user.id, "offline", null);
+        
+                    logText(`Client ${socket.user.id} disconnected`, "GATEWAY");
+        
+                    gateway.clients = gateway.clients.filter(client => client.socket !== socket);
+                }
+        
+                if (socket.hbTimeout) {
+                    clearTimeout(socket.hbTimeout);
+                }
+            });
 
             socket.on("message", async (data: any) => {
                 const msg = data.toString("utf-8");
@@ -296,6 +329,16 @@ const gateway: Gateway = {
                             return socket.close(4004, "Authentication Failed");
                         }
 
+                        const existingConnection = await gateway.clients.filter(x => x.user.id == user?.id)[0];
+
+                        if (existingConnection) {
+                            existingConnection.socket.close(4008, 'New connection has been established. This one is no longer needed.');
+
+                            gateway.clients = gateway.clients.filter(client => client.socket !== existingConnection.socket);
+
+                            logText(`Client ${user.id} reconnected -> Continuing on this socket`, "GATEWAY");
+                        }
+
                         const settings = user.settings;
 
                         delete user.settings;
@@ -307,8 +350,7 @@ const gateway: Gateway = {
                             token: packet.d.token,
                             sequence: 0,
                             socket: socket,
-                            user: user,
-                            lastHeartbeat: Date.now()
+                            user: user
                         });
 
                         const client = await gateway.clients.filter(x => x.user.id == user?.id)[0];
@@ -361,7 +403,10 @@ const gateway: Gateway = {
                             }
                         }
 
-                        client.sequence++;
+                        if (socket.sequence) {
+                            client.sequence++;
+                            socket.sequence++;
+                        }
 
                         let tutorial = await database.getTutorial(user.id);
 
@@ -395,54 +440,33 @@ const gateway: Gateway = {
                                 heartbeat_interval: heartbeat_interval // It seems that in 2015 discord, the heartbeat is sent over the READY event?
                             }
                         });
-
-                        let heartbeat = setInterval(async () => {
-                            let hClient = gateway.clients.filter(x => x.socket == socket)[0];
-
-                            console.log(hClient);
-                            console.log(hClient.lastHeartbeat)
-
-                            if (hClient && (Date.now() - hClient.lastHeartbeat) > heartbeat_interval) {
-                                clearInterval(heartbeat);
-
-                                logText(`${hClient.user.id} (${hClient.user.username}#${hClient.user.discriminator}) has bled out (heartbeat not acknowledged in ~${heartbeat_interval / 1000} seconds)`, "GATEWAY");
-                                
-                                socket.close(4009, 'Session timed out');
-
-                                await globalUtils.dispatchPresenceUpdate(hClient.user.id, "offline", null)
-
-                                await database.updatePresence(hClient.user.id, "offline", null);
-
-                                gateway.clients.splice(gateway.clients.indexOf(hClient), 1);
-                            }
-                        }, heartbeat_interval * 1.5); //some lenience to send yo packet bitch
                     break;
                     case 1:
-                        let hClient = gateway.clients.filter(x => x.socket == socket)[0];
+                        clearTimeout(socket.hbTimeout);
 
-                        if (hClient) {
-                            hClient.lastHeartbeat = Date.now();
+                        resetHB();
 
-                            logText(`Acknowledged client heartbeat from ${hClient.user.id} (${hClient.user.username}#${hClient.user.discriminator})`, "GATEWAY");
+                        //socket.send(JSON.stringify({
+                            //op: 11,
+                            //d: packet.d
+                        //}));
+
+                        if (socket.user != null) {
+                            logText(`Acknowledged client heartbeat from ${socket.user.id} (${socket.user.username}#${socket.user.discriminator})`, "GATEWAY");
                         }
                     break;
                     case 3:
-                        let pClient = gateway.clients.filter(x => x.socket == socket)[0];
-                        let pUser = pClient.user;
+                        let pUser = socket.user;
 
-                        if (packet.d.idle_since == null && packet.d.game_id == null) {
-                            if (pClient != null) {
-                                await globalUtils.dispatchPresenceUpdate(pUser.id, "online", null)
+                        if (pUser != null && packet.d.idle_since == null && packet.d.game_id == null) {
+                            await globalUtils.dispatchPresenceUpdate(pUser.id, "online", null)
 
-                                await database.updatePresence(pUser.id, "online", null);
-                            }
+                            await database.updatePresence(pUser.id, "online", null);
                         }
-                        else {
-                            if (pClient != null) {
-                                await globalUtils.dispatchPresenceUpdate(pUser.id, "idle", null)
+                        else if (pUser != null) {
+                            await globalUtils.dispatchPresenceUpdate(pUser.id, "idle", null)
 
-                                await database.updatePresence(pUser.id, "idle", null);
-                            }
+                            await database.updatePresence(pUser.id, "idle", null);
                         }
                     break;
                     case 4:

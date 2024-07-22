@@ -59,19 +59,19 @@ router.delete("/:code", async (req: Request, res: Response) => {
     const token = req.headers['authorization'];
 
     if (!token) {
-      return res.status(500).json({
-        code: 500,
-        message: "Internal Server Error"
-      });
+      return res.status(401).json({
+        code: 401,
+        message: "Unauthorized"
+    });
     }
 
     const sender = await database.getAccountByToken(token);
 
     if (sender == null) {
-      return res.status(500).json({
-        code: 500,
-        message: "Internal Server Error"
-      });
+      return res.status(401).json({
+        code: 401,
+        message: "Unauthorized"
+    });
     }
 
     const invite = await database.getInvite(req.params.code);
@@ -126,18 +126,18 @@ router.post("/:code", globalUtils.instanceMiddleware("NO_INVITE_USE"), async (re
     const token = req.headers['authorization'];
 
     if (!token) {
-      return res.status(500).json({
-        code: 500,
-        message: "Internal Server Error"
+      return res.status(401).json({
+        code: 401,
+        message: "Unauthorized"
       });
     }
 
     const sender = await database.getAccountByToken(token);
 
     if (sender == null) {
-      return res.status(500).json({
-        code: 500,
-        message: "Internal Server Error"
+      return res.status(401).json({
+        code: 401,
+        message: "Unauthorized"
       });
     }
 
@@ -165,12 +165,6 @@ router.post("/:code", globalUtils.instanceMiddleware("NO_INVITE_USE"), async (re
     delete invite.max_uses;
     delete invite.max_age;
     delete invite.xkcdpass;
-
-    const member = await database.getGuildMemberById(invite.guild.id, sender.id);
-
-    if (member != null) {
-      return res.status(200).send(invite);
-    }
 
     const client = await gateway.clients.filter(x => x.token == token)[0];
 

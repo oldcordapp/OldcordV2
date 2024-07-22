@@ -89,18 +89,18 @@ router.delete("/:roleid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES")
         const token = req.headers['authorization'];
     
         if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
+            return res.status(401).json({
+                code: 401,
+                message: "Unauthorized"
             });
         }
 
         const sender = await database.getAccountByToken(token);
 
         if (sender == null) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
+            return res.status(401).json({
+                code: 401,
+                message: "Unauthorized"
             });
         }
 
@@ -148,18 +148,18 @@ router.post("/", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"), async (
         const token = req.headers['authorization'];
     
         if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
+            return res.status(401).json({
+                code: 401,
+                message: "Unauthorized"
             });
         }
 
         const sender = await database.getAccountByToken(token);
 
         if (sender == null) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
+            return res.status(401).json({
+                code: 401,
+                message: "Unauthorized"
             });
         }
         

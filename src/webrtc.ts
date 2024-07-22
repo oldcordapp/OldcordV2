@@ -49,7 +49,7 @@ const webrtc: WebRTC = {
                             d: {
                                 ssrc: 1,
                                 ip: "127.0.0.1",
-                                port: 1234,
+                                port: 8000,
                                 modes: "plain",
                             }
                         })

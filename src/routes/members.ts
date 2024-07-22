@@ -13,25 +13,18 @@ router.delete("/:userid", globalUtils.guildPermissionsMiddleware("KICK_MEMBERS")
         const token = req.headers['authorization'];
     
         if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
+            return res.status(401).json({
+                code: 401,
+                message: "Unauthorized"
             });
         }
 
         const sender = await database.getAccountByToken(token);
 
         if (sender == null) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
-        if (sender.id == req.params.userid) {
-            return res.status(403).json({
-                code: 403,
-                message: "Missing Permissions"
+            return res.status(401).json({
+                code: 401,
+                message: "Unauthorized"
             });
         }
 
@@ -46,15 +39,6 @@ router.delete("/:userid", globalUtils.guildPermissionsMiddleware("KICK_MEMBERS")
 
         const client = await gateway.clients.filter(x => x.user.id == member.id)[0];
 
-        if (client == null) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
-        client.sequence++;
-
         const attempt = await database.leaveGuild(member.id, req.params.guildid);
 
         if (!attempt) {
@@ -64,23 +48,32 @@ router.delete("/:userid", globalUtils.guildPermissionsMiddleware("KICK_MEMBERS")
             });
         }
 
-        await gateway.dispatchEventTo(client.token, {
-            op: 0,
-            t: "GUILD_DELETE",
-            s: client.sequence,
-            d: {
-                id: req.params.guildid
-            }
-        });
+        if (client != null) {
+            client.sequence++;
+
+            await gateway.dispatchEventTo(client.token, {
+                op: 0,
+                t: "GUILD_DELETE",
+                s: client.sequence,
+                d: {
+                    id: req.params.guildid
+                }
+            });
+        }
 
         await gateway.dispatchEventInGuild(req.params.guildid, {
             op: 0,
             t: "GUILD_MEMBER_REMOVE",
             s: null,
             d: {
-              id: member.user.id,
-              user: member.user,
-              guild_id: req.params.guildid
+                roles: [],
+                user: {
+                    username: member.user.username,
+                    discriminator: member.user.discriminator,
+                    id: member.user.id,
+                    avatar: member.user.avatar
+                },
+                guild_id: req.params.guildid
             }
         });
 
@@ -100,18 +93,18 @@ router.patch("/:userid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"),
         const token = req.headers['authorization'];
     
         if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
+            return res.status(401).json({
+                code: 401,
+                message: "Unauthorized"
             });
         }
 
         const sender = await database.getAccountByToken(token);
 
         if (sender == null) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
+            return res.status(401).json({
+                code: 401,
+                message: "Unauthorized"
             });
         }
 
@@ -123,17 +116,6 @@ router.patch("/:userid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"),
                 message: "Unknown Member"
             });
         }
-
-        const client = await gateway.clients.filter(x => x.user.id == member.id)[0];
-
-        if (client == null) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
-        client.sequence++;
 
         const roles: string[] = [];
 
