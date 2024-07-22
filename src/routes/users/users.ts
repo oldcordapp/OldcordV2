@@ -7,7 +7,8 @@ import me from "./me";
 import gateway from '../../gateway';
 import Channel from '../../interfaces/guild/channel';
 import * as path from 'path';
-
+import Guild from '../../interfaces/guild';
+import Member from '../../interfaces/guild/member';
 const router = express.Router();
 
 router.use("/@me", me);
@@ -96,6 +97,39 @@ router.post("/:userid/channels", async (req: Request, res: Response) => {
 
             return res.status(200).json(channel);
         } else {
+            const theirguilds: Guild[] = await database.getUsersGuilds(user.id);
+            const myguilds: Guild[] = await database.getUsersGuilds(account.id);
+
+            let share: boolean = false;
+
+            for(var their of theirguilds) {
+                if (their.members != null && their.members.length > 0) {
+                    const theirmembers: Member[] = their.members;
+
+                    if (theirmembers.filter(x => x.id == account.id).length > 0) {
+                        share = true;
+                    }
+                }
+            }
+
+            for(var mine of myguilds) {
+                if (mine.members != null && mine.members.length > 0) {
+                    const mymembers: Member[] = mine.members;
+
+                    if (mymembers.filter(x => x.id == user.id).length > 0) {
+                        share = true;
+                    }
+                }
+            }
+
+            //horrendous code
+            if (!share) {
+                return res.status(403).json({
+                    code: 403,
+                    message: "Missing Permissions"
+                });
+            }
+
             const channel = await database.createDMChannel(account.id, user.id);
 
             if (channel == null || !user.token) {
