@@ -50,6 +50,7 @@ interface Database {
     closeDMChannel: (user_id: string, channel_id: string) => Promise<boolean>;
     isDMClosed: (user_id: string, channel_id: string) => Promise<boolean>;
     getClosedDMChannels: (user_id: string) => Promise<Channel[] | []>;
+    getUsersMessagesInGuild: (guild_id: string, author_id: string) => Promise<Message[] | []>;
     updateTutorial: (user_id: string, indicators_suppressed: boolean, indicators_confirmed: string[]) => Promise<boolean>;
     leaveGuild: (user_id: string, guild_id: string) => Promise<boolean>;
     joinGuild: (user_id: string, guild_id: string) => Promise<boolean>;
@@ -73,7 +74,7 @@ interface Database {
     addRole: (guild_id: string, role_id: string, user_id: string) => Promise<boolean>;
     createGuild: (owner_id: string, icon: string | null, name: string, region: string | null) => Promise<Guild | null>;
     createAccount: (username: string, email: string, password: string) => Promise<LoginResponse | StandardError>;
-    doesThisMatchPassword: (user_id: string, password: string) => Promise<boolean>;
+    doesThisMatchPassword: (password: string, hashed_password: string) => Promise<boolean>;
     updateMessage: (message_id: string, new_content: string) => Promise<boolean>;
     updateRole: (role_id: string, name: string, permissions: number, position: number | null) => Promise<boolean>;
     updateGuildWidget: (guild_id: string, channel_id: string | null, enabled: boolean) => Promise<boolean>;

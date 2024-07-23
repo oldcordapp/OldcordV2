@@ -675,6 +675,8 @@ const database: Database = {
                 SELECT * FROM members WHERE guild_id = $1
             `, [id]);
 
+            let guild_roles: Role[] = await database.getGuildRoles(id);
+
             if (rows != null && rows.length > 0) {
                 const ret: Member[] = [];
 
@@ -687,14 +689,14 @@ const database: Database = {
                         for(var db_role of db_roles) {
                             const role = await database.getRoleById(db_role);
 
-                            if (role != null) {
+                            if (role != null && guild_roles.find(x => x.id == role.id)) {
                                 roles.push(role.id);
                             }
                         }
                     } else {
                         const role = await database.getRoleById(row.roles);
 
-                        if (role != null) {
+                        if (role != null && guild_roles.find(x => x.id == role.id)) {
                             roles.push(role.id);
                         }
                     }
@@ -708,6 +710,12 @@ const database: Database = {
                         delete user.settings;
                         delete user.verified;
                         delete user.created_at;
+
+                        let everyoneRole = guild_roles.find(x => x.name == '@everyone');
+
+                        if (everyoneRole != null && !roles.includes(everyoneRole.id)) {
+                            roles.push(everyoneRole.id);
+                        }
 
                         ret.push({
                             id: row.user_id,
@@ -815,6 +823,33 @@ const database: Database = {
             logText(error.toString(), "error");
 
             return null;
+        }
+    },
+    getUsersMessagesInGuild: async (guild_id: string, author_id: string) => {
+        try {
+            const rows = await database.runQuery(`
+                SELECT * FROM messages WHERE author_id = $1 AND guild_id = $2
+            `, [author_id, guild_id]);
+
+            if (rows == null || rows.length == 0) {
+                return [];
+            }
+
+            const ret: Message[] = [];
+
+            for(var row of rows) {
+                const message = await database.getMessageById(row.message_id);
+
+                if (message != null) {
+                    ret.push(message);
+                }
+            }
+
+            return ret;
+        } catch (error: any) {
+            logText(error.toString(), "error");
+
+            return [];
         }
     },
     getMessageById: async (id: string) => {
@@ -1005,8 +1040,6 @@ const database: Database = {
                 SELECT * FROM guilds WHERE id = $1
             `, [id]);
 
-            console.log("GETTING GUILD");
-
             if (rows == null || rows.length == 0) {
                 return null;
             }
@@ -1032,7 +1065,6 @@ const database: Database = {
             //let presences: any[] = [];
             let presences: Presence[] = await database.getGuildPresences(id);
 
-            console.log(JSON.stringify(presences));
             let fixed_presences: any[] = []
 
             if (presences.length > 0) {

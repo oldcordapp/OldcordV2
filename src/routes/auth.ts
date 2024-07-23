@@ -101,7 +101,7 @@ router.post("/register", globalUtils.instanceMiddleware("NO_REGISTRATION"), asyn
             t: "PRESENCE_UPDATE",
             s: null,
             d: {
-              game: null,
+              game_id: null,
               status: "online",
               user: {
                 username: account.username,

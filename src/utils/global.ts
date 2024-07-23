@@ -405,7 +405,8 @@ const globalUtils = {
         let guilds = await database.getUsersGuilds(user.id);
 
         if (guilds.length == 0) {
-            gateway.dispatchEventTo(user.token, {
+            await gateway.dispatchEventTo(user.token, {
+                op: 0,
                 t: "PRESENCE_UPDATE",
                 s: null,
                 d: {
@@ -419,13 +420,14 @@ const globalUtils = {
                     },
                     status: new_status
                 }
-            });
+              });
 
             return true;
         }
 
         for(var guild of guilds) {
-            gateway.dispatchEventInGuild(guild.id, {
+            await gateway.dispatchEventInGuild(guild.id, {
+                op: 0,
                 t: "PRESENCE_UPDATE",
                 s: null,
                 d: {

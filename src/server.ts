@@ -1,3 +1,7 @@
+import * as dotenv from 'dotenv'
+
+dotenv.config();
+
 import * as express from 'express';
 import { Request, Response } from 'express';
 import auth from './routes/auth';
@@ -82,8 +86,6 @@ app.get("/assets/:asset", async (req: Request, res: Response) => {
     }
 
     if (config.cache404s && cached404s[req.params.asset] == 1) {
-        console.log('404');
-
         return res.status(404).send("File not found");
     }
 
@@ -112,8 +114,6 @@ app.get("/assets/:asset", async (req: Request, res: Response) => {
             }
         }
 
-        console.log(timestamps.first_ts);
-
         let timestamp = timestamps.first_ts;
 
         let snapshot_url = `https://web.archive.org/web/${timestamp}im_/https://discordapp.com/assets/${req.params.asset}`;
@@ -134,6 +134,10 @@ app.get("/assets/:asset", async (req: Request, res: Response) => {
                 str = str.replace(`"discord.gg"`, `"${(config.local_deploy ? config.base_url + ":" + config.port : config.base_url)}/invites"`);
                 str = str.replace("d3dsisomax34re.cloudfront.net", (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
                 str = str.replace(/discordapp.com/g, (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
+
+                //if (req.params.asset.toLowerCase().includes('a872e2bb95aa9d365050.js')) {
+                //    str = str.replace(`var l=t.roles.get(a.roles[s]);i|=l.permissions`, `var l=t.roles.get(a.roles[s]);if (l!=undefined)i|=l.permissions`);
+                //} else if (req.params.asset.toLowerCase().includes('a872e2bb95aa9d365050.js'))
 
                 body = Buffer.from(str);
 

@@ -5,15 +5,20 @@ import database from "./utils/database";
 import globalUtils from "./utils/global";
 import Channel from "./interfaces/guild/channel";
 import Client from "./interfaces/gateway/client";
+import Member from "./interfaces/guild/member";
 
 const gateway: Gateway = {
     server: null,
     port: null,
     clients: [],
     dispatchEventToAll: (data: any) => {
+        console.log(`[DISPATCHER] -> ${JSON.stringify(data)}`);
+
         for(var client of gateway.clients) {
             gateway.send(client.socket, data);
         }
+
+        console.log(`[DISPATCH EVENT TO ALL] -> ${JSON.stringify(data)}`)
 
         return true;
     },
@@ -28,6 +33,8 @@ const gateway: Gateway = {
         if (socket == null) {
             return false;
         }
+
+        console.log(`[DISPATCH EVENT TO] -> ${JSON.stringify(data)}`)
 
         gateway.send(socket, data);
 
@@ -59,6 +66,8 @@ const gateway: Gateway = {
 
         gateway.send(socket1, data);
         gateway.send(socket2, data);
+
+        console.log(`[DISPATCH EVENT IN DMS] -> ${JSON.stringify(data)}`)
 
         return true;
     },
@@ -93,7 +102,13 @@ const gateway: Gateway = {
             let account = await database.getAccountByUserId(member.id);
 
             if (account == null || !account.token) {
-                return false;
+                continue;
+            }
+
+            var socket = gateway.getSocket(account.token);
+
+            if (socket == null) {
+                continue;
             }
 
             const guildPermCheck = await globalUtils.hasGuildPermissionTo(guild.id, account.id, permission_check);
@@ -102,73 +117,20 @@ const gateway: Gateway = {
                 const channelPermCheck = await globalUtils.hasChannelPermissionTo(channel.id, account.id, permission_check);
 
                 if (!guildPermCheck && !channelPermCheck) {
-                    return false;
-                }
+                    continue;
+                } //else {
+                    //await gateway.send(socket, data);
+                    
+                    //return true;
+                //}
             }
 
             if (!guildPermCheck) {
-                return false;
-            }
-
-            var socket = gateway.getSocket(account.token);
-
-            if (socket == null) {
-                return false;
+                continue;
             }
 
             await gateway.send(socket, data);
         }
-
-        return true;
-    },
-    dispatchEventToPerms: async (token: string, guild_id: string, channel_id: string | null, permission_check: string, data: any) => {
-        let account = await database.getAccountByToken(token);
-
-        if (account == null) {
-            return false;
-        }
-
-        let guild = await database.getGuildById(guild_id);
-
-        if (guild == null) {
-            return false;
-        }
-
-        let chanId: string | null = channel_id;
-        let checkChannel = true;
-
-        if (chanId == null) {
-            chanId = "...";
-            checkChannel = false;
-        }
-
-        const channel = await database.getChannelById(chanId);
-
-        if (channel == null && !checkChannel) {
-            return false;
-        }
-
-        const guildPermCheck = await globalUtils.hasGuildPermissionTo(guild.id, account.id, permission_check);
-
-        if (checkChannel && channel != null) {
-            const channelPermCheck = await globalUtils.hasChannelPermissionTo(channel.id, account.id, permission_check);
-
-            if (!guildPermCheck && !channelPermCheck) {
-                return false;
-            }
-        }
-
-        if (!guildPermCheck) {
-            return false;
-        }
-
-        var socket = gateway.getSocket(token);
-
-        if (socket == null) {
-            return false;
-        }
-
-        await gateway.send(socket, data);
 
         return true;
     },
@@ -189,13 +151,13 @@ const gateway: Gateway = {
             let account = await database.getAccountByUserId(member.id);
 
             if (account == null || !account.token) {
-                return false;
+                continue;
             }
 
             var socket = gateway.getSocket(account.token);
 
             if (socket == null) {
-                return false;
+                continue;
             }
             
             await gateway.send(socket, data);
@@ -216,7 +178,7 @@ const gateway: Gateway = {
             return false;
         }
 
-        const members = await database.getGuildMembers(channel.guild_id);
+        const members: Member[] = await database.getGuildMembers(channel.guild_id);
 
         if (members.length == 0) {
             return false;
@@ -226,23 +188,25 @@ const gateway: Gateway = {
             let permissions = await globalUtils.hasChannelPermissionTo(channel.id, member.id, "READ_MESSAGES");
 
             if (!permissions) {
-                return false;
+                continue;
             }
 
             let account = await database.getAccountByUserId(member.id);
 
             if (account == null || !account.token) {
-                return false;
+                continue;
             }
 
             var socket = gateway.getSocket(account.token);
 
             if (socket == null) {
-                return false;
+                continue;
             }
 
             await gateway.send(socket, data);
         }
+
+        console.log(`[DISPATCH EVENT IN CHANNEL] -> ${JSON.stringify(data)}`)
 
         return true;
     },
@@ -289,12 +253,12 @@ const gateway: Gateway = {
 
                     let cur_socket = gateway.clients.filter(x => x.socket == socket)[0];
 
-                    if (cur_socket != null && cur_socket.user) {
+                    if (cur_socket != null && cur_socket.user != null) {
                         logText(`Acknowledged client heartbeat from ${cur_socket.user.id} (${cur_socket.user.username}#${cur_socket.user.discriminator})`, "GATEWAY");
                     } 
 
                     handler.hbTimeout = setTimeout(async () => {
-                        if (cur_socket.user != null) {
+                        if (cur_socket != null && cur_socket.user != null) {
                             await globalUtils.dispatchPresenceUpdate(cur_socket.user.id, "offline", null);
                         }
 
@@ -316,7 +280,7 @@ const gateway: Gateway = {
 
                 let cur_socket = gateway.clients.filter(x => x.socket == socket)[0];
 
-                if (cur_socket.user != null) {
+                if (cur_socket != null && cur_socket.user != null) {
                     await globalUtils.dispatchPresenceUpdate(cur_socket.user.id, "offline", null);
 
                     logText(`Client ${cur_socket.user.id} disconnected`, "GATEWAY");
@@ -348,8 +312,6 @@ const gateway: Gateway = {
                         const existingConnection = await gateway.clients.filter(x => x.user.id == user?.id)[0];
 
                         if (existingConnection) {
-                            await globalUtils.dispatchPresenceUpdate(existingConnection.user.id, "offline", null);
-
                             existingConnection.socket.close(4008, 'New connection has been established. This one is no longer needed.');
 
                             gateway.clients = gateway.clients.filter(client => client.socket !== existingConnection.socket);
@@ -381,15 +343,9 @@ const gateway: Gateway = {
                             }
                         });
 
-                        console.log("1");
-
                         const client = gateway.clients.filter(x => x.user.id == user?.id)[0];
 
-                        await globalUtils.dispatchPresenceUpdate(user.id, "online", null)
-
                         const guilds = await database.getUsersGuilds(user.id);
-
-                        console.log("2");
 
                         let presences: any[] = [];
 
@@ -467,6 +423,8 @@ const gateway: Gateway = {
                                 heartbeat_interval: heartbeat_interval // It seems that in 2015 discord, the heartbeat is sent over the READY event?
                             }
                         });
+
+                        await globalUtils.dispatchPresenceUpdate(user.id, "online", null)
                     break;
                     case 1:
                         let handler2 = timeOutHandlers.filter(x => x.socket == socket)[0];
@@ -503,7 +461,7 @@ const gateway: Gateway = {
                                     }
                                 }
                             }
-                            else if (pUser != null) {
+                            else if (pUser != null && packet.d.idle_since != null && packet.d.status == 'idle') {
                                 await globalUtils.dispatchPresenceUpdate(pUser.id, "idle", null);
     
                                 let client = gateway.clients.filter(x => x.socket == socket)[0];

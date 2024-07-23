@@ -44,6 +44,98 @@ router.get("/", globalUtils.channelPermissionsMiddleware("READ_MESSAGE_HISTORY")
             });
         }
 
+        const messages: Message[] = await database.getChannelMessages(channel.id);
+
+        if (messages == null || messages.length == 0) {
+            return res.status(200).json([]);
+        }
+
+        let limit = req.query.limit ? parseInt(req.query.limit as string) : messages.length;
+        const ret: Message[] = [];
+
+        if (limit > 200) {
+            limit = 200;
+        }
+
+        if (req.query.before) {
+            const msg: Message | undefined = messages.find(x => x.id == req.query.before);
+            if (msg != null) {
+                const index: number = messages.indexOf(msg);
+                let counter: number = 0;
+
+                for (let i = index + 1; i < messages.length; i++) {
+                    if (counter >= limit) {
+                        break;
+                    }
+
+                    const message = messages[i];
+
+                    if (message == null) {
+                        continue;
+                    }
+
+                    ret.push(message);
+                    counter++;
+                }
+            }
+        } else {
+            let count: number = 0;
+
+            for (const msg of messages) {
+                if (count >= limit) {
+                    break;
+                }
+
+                if (msg == null) {
+                    continue;
+                }
+
+                ret.push(msg);
+                count++;
+            }
+        }
+
+        return res.status(200).json(ret);
+    } catch (error: any) {
+        logText(error.toString(), "error");
+
+        return res.status(500).json({
+            code: 500,
+            message: "Internal Server Error"
+        });
+    }
+});
+
+/*
+router.get("/", globalUtils.channelPermissionsMiddleware("READ_MESSAGE_HISTORY"), async (req: Request, res: Response) => {
+    try {
+        const token = req.headers['authorization'];
+    
+        if (!token) {
+            return res.status(500).json({
+                code: 500,
+                message: "Internal Server Error"
+            });
+        }
+
+        const creator = await database.getAccountByToken(token);
+
+        if (creator == null) {
+            return res.status(500).json({
+                code: 500,
+                message: "Internal Server Error"
+            });
+        }
+
+        const channel = await database.getChannelById(req.params.channelid);
+
+        if (channel == null) {
+            return res.status(404).json({
+                code: 404,
+                message: "Unknown Channel"
+            });
+        }
+
         if (channel.recipient != null) {
             const messages: Message[] = await database.getChannelMessages(channel.id);
     
@@ -60,9 +152,9 @@ router.get("/", globalUtils.channelPermissionsMiddleware("READ_MESSAGE_HISTORY")
                     const index: number = messages.indexOf(msg);
                     let counter: number = 0;
     
-                    for (let i = index; i < messages.length + 1; i++) {
+                    for (let i = index; i < messages.length; i++) {
                         if (counter == Number(req.query.limit)) {
-                            continue;
+                            break;
                         }
                 
                         var message = messages[i];
@@ -83,7 +175,7 @@ router.get("/", globalUtils.channelPermissionsMiddleware("READ_MESSAGE_HISTORY")
     
                 for(let msg of messages) {
                     if (count == Number(req.query.limit)) {
-                        continue;
+                        break;
                     }
     
                     if (msg == null) {
@@ -120,9 +212,9 @@ router.get("/", globalUtils.channelPermissionsMiddleware("READ_MESSAGE_HISTORY")
                     const index: number = messages.indexOf(msg);
                     let counter: number = 0;
     
-                    for (let i = index; i < messages.length + 1; i++) {
+                    for (let i = index; i < messages.length; i++) {
                         if (counter == Number(req.query.limit)) {
-                            continue;
+                            break;
                         }
                 
                         var message = messages[i];
@@ -143,7 +235,7 @@ router.get("/", globalUtils.channelPermissionsMiddleware("READ_MESSAGE_HISTORY")
     
                 for(let msg of messages) {
                     if (count == Number(req.query.limit)) {
-                        continue;
+                        break;
                     }
     
                     if (msg == null) {
@@ -167,6 +259,7 @@ router.get("/", globalUtils.channelPermissionsMiddleware("READ_MESSAGE_HISTORY")
         });
     }
 });
+*/
 
 router.post("/", upload.single('file'), globalUtils.channelPermissionsMiddleware("SEND_MESSAGES"), async (req: Request, res: Response) => {
     try {

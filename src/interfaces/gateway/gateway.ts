@@ -12,7 +12,6 @@ interface Gateway {
     send: (socket: WebSocket, data: any) => void;
     dispatchEventToAll: (data: any) => boolean;
     dispatchEventTo: (token: string, data: any) => boolean;
-    dispatchEventToPerms: (token: string, guild_id: string, channel_id: string | null, permission_check: string, data: any) => Promise<boolean>;
     dispatchEventToAllPerms: (guild_id: string, channel_id: string | null, permission_check: string, data: any) => Promise<boolean>;
     dispatchEventInGuild: (guild_id: string, data: any) => Promise<boolean>;
     dispatchEventInChannel: (channel_id: string, data: any) => Promise<boolean>;

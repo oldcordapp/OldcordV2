@@ -5,6 +5,7 @@ import database from '../utils/database';
 import { logText } from '../utils/logger';
 import globalUtils from '../utils/global';
 import Ban from '../interfaces/guild/ban';
+import Message from '../interfaces/guild/message';
 
 const router = express.Router({ mergeParams: true });
 
@@ -132,6 +133,48 @@ router.put("/:memberid", globalUtils.guildPermissionsMiddleware("BAN_MEMBERS"), 
                 roles: []
             }
         });
+
+        if (req.query['delete-message-days']) {
+            let deleteMessageDays = parseInt(req.query['delete-message-days'] as string);
+
+            if (deleteMessageDays > 7) {
+                deleteMessageDays = 7;
+            }
+
+            if (deleteMessageDays > 0) {
+                let messages: Message[] = await database.getUsersMessagesInGuild(req.params.guildid, member.user.id);
+
+                const deletemessagedaysDate = new Date();
+                
+                deletemessagedaysDate.setDate(deletemessagedaysDate.getDate() - deleteMessageDays);
+
+                messages = messages.filter(message => {
+                    const messageTimestamp = new Date(message.timestamp);
+                    
+                    return messageTimestamp >= deletemessagedaysDate;
+                });
+
+                if (messages.length > 0) {
+                    for(var message of messages) {
+                        let tryDelete = await database.deleteMessage(message.id);
+
+                        if (tryDelete) {
+                            await gateway.dispatchEventInChannel(message.channel_id, {
+                                op: 0,
+                                t: "MESSAGE_DELETE",
+                                s: null,
+                                d: {
+                                    id: message.id,
+                                    guild_id: req.params.guildid,
+                                    channel_id: message.channel_id
+                                }
+                            })
+                        }
+                    }
+                }
+            }
+        }
+        
 
         return res.status(204).send();
     } catch (error: any) {

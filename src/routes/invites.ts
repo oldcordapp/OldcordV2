@@ -214,7 +214,7 @@ router.post("/:code", globalUtils.instanceMiddleware("NO_INVITE_USE"), async (re
       t: "PRESENCE_UPDATE",
       s: null,
       d: {
-        game: null,
+        game_id: null,
         status: "online",
         user: {
           username: sender.username,

@@ -624,14 +624,7 @@ router.delete("/:channelid", globalUtils.channelMiddleware, globalUtils.guildPer
                     message: "Missing Permissions"
                 });
             }
-    
-            if (!await database.deleteChannel(channel.id)) {
-                return res.status(500).json({
-                    code: 500,
-                    message: "Internal Server Error"
-                });
-            }
-    
+
             await gateway.dispatchEventInChannel(channel.id, {
                 op: 0,
                 t: "CHANNEL_DELETE",
@@ -641,6 +634,13 @@ router.delete("/:channelid", globalUtils.channelMiddleware, globalUtils.guildPer
                     guild_id: channel.guild_id
                 }
             });
+    
+            if (!await database.deleteChannel(channel.id)) {
+                return res.status(500).json({
+                    code: 500,
+                    message: "Internal Server Error"
+                });
+            }
     
             return res.status(204).send();
         }

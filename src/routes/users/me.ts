@@ -101,7 +101,6 @@ router.patch("/", async (req: Request, res: Response) => {
 
     delete account.settings;
     delete account.token;
-    delete account.password;
     delete account.created_at;
 
     if (req.body.username == account.username && req.body.email == account.email && (req.body.password == "" || req.body.password == null)) {
@@ -111,9 +110,7 @@ router.patch("/", async (req: Request, res: Response) => {
         account = await database.getAccountByEmail(req.body.email);
 
         if (account != null) {
-          delete account.settings;
           delete account.password;
-          delete account.created_at;
 
           await gateway.dispatchEventTo(token, {
              t: "USER_UPDATE",
@@ -159,7 +156,14 @@ router.patch("/", async (req: Request, res: Response) => {
         })
       }
 
-      const correctPassword = await database.doesThisMatchPassword(account.id, req.body.password);
+      if (account.password == null) {
+        return res.status(500).json({
+          code: 500,
+          message: "Internal Server Error"
+        });
+      }
+
+      const correctPassword = await database.doesThisMatchPassword(req.body.password, account.password);
 
       if (!correctPassword) {
         return res.status(400).json({
