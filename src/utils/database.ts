@@ -2108,16 +2108,9 @@ const database: Database = {
             }
         }
     },
-    doesThisMatchPassword: async (user_id: string, password: string) => {
+    doesThisMatchPassword: async (password_raw: string, password_hash: string) => {
         try {
-            let user = await database.getAccountByUserId(user_id)
-
-            // IHATE TYPESCRIPT I HATE TYPESCRIPT I HATE TYPESCRIPT
-            if (user == null || !user?.email || !user?.password || !user?.token || !user?.settings) {
-                return false;
-            }
-            
-            let comparison = compareSync(password, user.password);
+            let comparison = compareSync(password_raw, password_hash);
 
             if (!comparison) {
                 return false;
@@ -2143,25 +2136,29 @@ const database: Database = {
             return false;
         }
     },
-    updateAccount: async (avatar: string | null, email: string | null, username: string | null, password: string | null, new_password: string | null) => {
+    updateAccount: async (avatar: string | null, email: string | null, username: string | null, password: string | null, new_password: string | null, new_email: string | null) => {
         try {
-            if (email == "" || !email || email == null) {
+            if (email == null) {
                 return false;
             }
 
-            if (username == "" || !username || username == null) {
+            if (username == null) {
                 return false;
             }
 
             const account = await database.getAccountByEmail(email);
 
-            if (account == null) {
+            if (account == null || !account.password || !account.email) {
                 return false;
             }
-            
+
             let new_avatar = avatar;
-            let new_email = email;
+            let new_email2 = email;
             let new_username = username;
+
+            if (new_email != null) {
+                new_email2 = new_email;
+            }
 
             if (avatar != null && avatar.includes("data:image/")) {
                 var extension = avatar.split('/')[1].split(';')[0];
@@ -2186,29 +2183,51 @@ const database: Database = {
                 await database.runQuery(`UPDATE users SET avatar = $1 WHERE id = $2`, ['NULL', account.id]);
             }
 
-            if (password != null) {
-                const checkPassword = await database.doesThisMatchPassword(account.id, password);
+            if ((new_email2 != account.email && new_username != account.username) || (new_email2 != account.email || new_username != account.username)) {
+                if (password == null) {
+                    return false;
+                }
 
-                if (email != account.email && !checkPassword) {
+                const checkPassword = await database.doesThisMatchPassword(password, account.password);
+
+                if (!checkPassword) {
                     return false;
                 }
-    
-                if (username != account.username && !checkPassword) {
-                    return false;
-                }
-    
-                if (new_password != null && new_password != "") {
+
+                if (new_password != null) {
+                    const checkPassword = await database.doesThisMatchPassword(new_password, account.password);
+
+                    if (checkPassword) {
+                        return false;
+                    }
+
                     let salt = await genSalt(10);
                     let newPwHash = await hash(new_password, salt);
                     let token = globalUtils.generateToken(account.id, newPwHash);
     
-                    await database.runQuery(`UPDATE users SET username = $1, email = $2, password = $3, token = $4 WHERE id = $5`, [new_username, new_email, newPwHash, token, account.id]);
+                    await database.runQuery(`UPDATE users SET username = $1, email = $2, password = $3, token = $4 WHERE id = $5`, [new_username, new_email2, newPwHash, token, account.id]);
                 } else {
-                    await database.runQuery(`UPDATE users SET username = $1, email = $2 WHERE id = $3`, [new_username, new_email, account.id]);
+                    await database.runQuery(`UPDATE users SET username = $1, email = $2 WHERE id = $3`, [new_username, new_email2, account.id]);
                 }
+
+                return true;
+            } else if (new_password != null) {
+                const checkPassword = await database.doesThisMatchPassword(new_password, account.password);
+
+                if (checkPassword) {
+                    return false;
+                }
+
+                let salt = await genSalt(10);
+                let newPwHash = await hash(new_password, salt);
+                let token = globalUtils.generateToken(account.id, newPwHash);
+
+                await database.runQuery(`UPDATE users SET username = $1, email = $2, password = $3, token = $4 WHERE id = $5`, [new_username, new_email2, newPwHash, token, account.id]);
+                
+                return true;
             }
             
-            return true;
+            return false;
         } catch (error: any) {
             logText(error.toString(), "error");
 

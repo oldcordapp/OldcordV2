@@ -84,103 +84,53 @@ router.patch("/", async (req: Request, res: Response) => {
     const token = req.headers['authorization'];
 
     if (!token) {
-      return res.status(500).json({
-        code: 500,
-        message: "Internal Server Error"
+      return res.status(401).json({
+        code: 401,
+        message: "Unauthorized"
       });
     }
 
     let account = await database.getAccountByToken(token);
 
-    if (account == null) {
-      return res.status(500).json({
-        code: 500,
-        message: "Internal Server Error"
+    if (account == null || !account.email || !account.password || !account.token) {
+      return res.status(401).json({
+        code: 401,
+        message: "Unauthorized"
       });
     }
 
     delete account.settings;
-    delete account.token;
     delete account.created_at;
 
-    if (req.body.username == account.username && req.body.email == account.email && (req.body.password == "" || req.body.password == null)) {
-      const attemptToUpdateAvi = await database.updateAccount(req.body.avatar, req.body.email, req.body.username, null, null);
+    if (!req.body.avatar || req.body.avatar == "") req.body.avatar = null;
+
+    if (!req.body.email || req.body.email == "") req.body.email = null;
+
+    if (!req.body.new_password || req.body.new_password == "") req.body.new_password = null;
+
+    if (!req.body.password || req.body.password == "") req.body.password = null;
+
+    if (!req.body.username || req.body.username == "") req.body.username = null;
+
+    let update_object: any = {
+      avatar: req.body.avatar == ("" || null || undefined) ? null : req.body.avatar,
+      email: req.body.email == ("" || null || undefined) ? null : req.body.email,
+      new_password: req.body.new_password == ("" || null || undefined) ? null : req.body.new_password,
+      password: req.body.password == ("" || null || undefined) ? null : req.body.password,
+      username: req.body.username == ("" || null || undefined) ? null : req.body.username
+    };
+
+    if (update_object.email == account.email && update_object.new_password == null && update_object.password == null && update_object.username == account.username) {
+       //avatar change
+
+      const attemptToUpdateAvi = await database.updateAccount(update_object.avatar, account.email, account.username, null, null, null);
 
       if (attemptToUpdateAvi) {
-        account = await database.getAccountByEmail(req.body.email);
+        account = await database.getAccountByEmail(account.email);
 
         if (account != null) {
           delete account.password;
-
-          await gateway.dispatchEventTo(token, {
-             t: "USER_UPDATE",
-             op: 0,
-             s: null,
-             d: account
-          })
-  
-          return res.status(200).json(account);
-        }
-      }
-
-      return res.status(500).json({
-        code: 500,
-        message: "Internal Server Error"
-      });
-    } else {
-      if (!req.body.username || req.body.username == "") {
-        return res.status(400).json({
-          code: 400,
-          username: "This field is required"
-        })
-      }
-
-      if (!req.body.password || req.body.password == "") {
-        return res.status(400).json({
-          code: 400,
-          password: "This field is required"
-        })
-      }
-
-      if (!req.body.email || req.body.email == "") {
-        return res.status(400).json({
-          code: 400,
-          email: "This field is required"
-        })
-      }
-
-      if (req.body.username.length < 2) {
-        return res.status(400).json({
-          code: 400,
-          username: "Must be between 2 and 32 characters"
-        })
-      }
-
-      if (account.password == null) {
-        return res.status(500).json({
-          code: 500,
-          message: "Internal Server Error"
-        });
-      }
-
-      const correctPassword = await database.doesThisMatchPassword(req.body.password, account.password);
-
-      if (!correctPassword) {
-        return res.status(400).json({
-          code: 400,
-          password: "Incorrect password"
-        })
-      }
-
-      const update = await database.updateAccount(req.body.avatar, req.body.email, req.body.username, req.body.password, req.body.new_password);
-
-      if (update) {
-        account = await database.getAccountByEmail(req.body.email);
-
-        if (account != null) {
           delete account.settings;
-          delete account.password;
-          delete account.token;
           delete account.created_at;
 
           await gateway.dispatchEventTo(token, {
@@ -188,19 +138,98 @@ router.patch("/", async (req: Request, res: Response) => {
             op: 0,
             s: null,
             d: account
-         })
-          
+          });
+
           return res.status(200).json(account);
         }
+      } else return res.status(500).json({
+        code: 500,
+        message: "Internal Server Error"
+      });
+    } else {
+      if (update_object.password == null) {
+        return res.status(400).json({
+          code: 400,
+          password: "This field is required"
+        });
       }
 
-      return res.status(400).json({
-        code: 400,
-        username: "Something went wrong while updating account details.",
-        email: "Check all input fields correctly.",
-        password: "And try again."
-      })
+      if (update_object.email == null) {
+        return res.status(400).json({
+          code: 400,
+          email: "This field is required"
+        });
+      }
+
+      if (update_object.username == null) {
+        return res.status(400).json({
+          code: 400,
+          username: "This field is required"
+        });
+      }
+
+      if (update_object.username.length < 2 || update_object.username.length > 32) {
+        return res.status(400).json({
+          code: 400,
+          username: "Must be between 2 and 32 characters"
+        });
+      }
+
+      if (update_object.email.length < 2 || update_object.email.length > 32) {
+        return res.status(400).json({
+          code: 400,
+          email: "Must be between 2 and 32 characters"
+        });
+      }
+
+      if (update_object.password.length > 64) {
+        return res.status(400).json({
+          code: 400,
+          password: "Must be under 64 characters"
+        });
+      }
+
+      if ((update_object.email != account.email || update_object.username != account.username) || (update_object.email != account.email && update_object.username != account.username)) {
+        const correctPassword = await database.doesThisMatchPassword(update_object.password, account.password);
+
+        if (!correctPassword) {
+          return res.status(400).json({
+            code: 400,
+            password: "Incorrect password"
+          })
+        }
+
+        const update = await database.updateAccount(update_object.avatar, account.email, update_object.username, update_object.password, update_object.new_password, update_object.email);
+
+        if (update) {
+          account = await database.getAccountByEmail(update_object.email);
+  
+          if (account != null) {
+            delete account.settings;
+            delete account.password;
+            delete account.created_at;
+  
+            await gateway.dispatchEventTo(token, {
+              t: "USER_UPDATE",
+              op: 0,
+              s: null,
+              d: account
+           })
+            
+            return res.status(200).json(account);
+          }
+        }
+      }
     }
+
+    if (account != null) {
+      delete account.password;
+      delete account.settings;
+      delete account.created_at;
+    }
+
+
+    return res.status(200).json(account);
   } catch (error: any) {
     logText(error.toString(), "error");
 

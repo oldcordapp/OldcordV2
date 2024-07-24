@@ -74,14 +74,14 @@ interface Database {
     addRole: (guild_id: string, role_id: string, user_id: string) => Promise<boolean>;
     createGuild: (owner_id: string, icon: string | null, name: string, region: string | null) => Promise<Guild | null>;
     createAccount: (username: string, email: string, password: string) => Promise<LoginResponse | StandardError>;
-    doesThisMatchPassword: (password: string, hashed_password: string) => Promise<boolean>;
+    doesThisMatchPassword: (password_raw: string, password_hash: string) => Promise<boolean>;
     updateMessage: (message_id: string, new_content: string) => Promise<boolean>;
     updateRole: (role_id: string, name: string, permissions: number, position: number | null) => Promise<boolean>;
     updateGuildWidget: (guild_id: string, channel_id: string | null, enabled: boolean) => Promise<boolean>;
     updateChannelPermissionOverwrites: (channel_id: string, overwrites: Permission_Overwrite[]) => Promise<boolean>;
     deleteChannelPermissionOverwrite: (channel_id: string, overwrite: Permission_Overwrite) => Promise<boolean>;
     updateSettings: (user_id: string, new_settings: string) => Promise<boolean>;
-    updateAccount: (avatar: string | null, email: string | null, username: string | null, password: string | null, new_password: string | null) => Promise<boolean>;
+    updateAccount: (avatar: string | null, email: string | null, username: string | null, password: string | null, new_password: string | null, new_email: string | null) => Promise<boolean>;
     checkAccount: (email: string, password: string) => Promise<LoginResponse | StandardError>;
 }
 
