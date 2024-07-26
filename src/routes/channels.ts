@@ -10,29 +10,35 @@ import Guild from '../interfaces/guild';
 import permissions from '../utils/permissions';
 import config from '../utils/config';
 
+
 const router = express.Router({ mergeParams: true });
 
-router.post("/:channelid/typing", globalUtils.channelMiddleware, globalUtils.channelPermissionsMiddleware("SEND_MESSAGES"), async (req: Request, res: Response) => {
-    try {
-        const token = req.headers['authorization'];
+router.param('channelid', async (req: any, res: any, next: any, channelid: any) => {
+    const channel = await database.getChannelById(channelid);
+
+    req.channel = channel;
+
+    if (channel && channel.guild_id) {
+        req.guild = await database.getGuildById(channel.guild_id);
+    }
+
+    console.log(JSON.stringify(req.channel));
     
-        if (!token) {
+    next();
+});
+
+router.post("/:channelid/typing", globalUtils.channelMiddleware, globalUtils.channelPermissionsMiddleware("SEND_MESSAGES"), globalUtils.rateLimitMiddleware(100, 1000 * 60), async (req: any, res: any) => {
+    try {
+        const typer = req.account;
+
+        if (!typer || !typer.token) {
             return res.status(500).json({
                 code: 500,
                 message: "Internal Server Error"
             });
         }
 
-        const typer = await database.getAccountByToken(token);
-
-        if (typer == null) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
-        const channel = await database.getChannelById(req.params.channelid);
+        const channel = req.channel;
 
         if (channel == null) {
             return res.status(404).json({
@@ -100,27 +106,18 @@ router.post("/:channelid/typing", globalUtils.channelMiddleware, globalUtils.cha
     }
 });
 
-router.patch("/:channelid", globalUtils.channelMiddleware, globalUtils.channelPermissionsMiddleware("MANAGE_CHANNELS"), async (req: Request, res: Response) => {
+router.patch("/:channelid", globalUtils.channelMiddleware, globalUtils.channelPermissionsMiddleware("MANAGE_CHANNELS"), globalUtils.rateLimitMiddleware(100, 1000 * 60 * 60), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
+        const sender = req.account;
+
+        if (!sender || !sender || !sender.token) {
             return res.status(500).json({
                 code: 500,
                 message: "Internal Server Error"
             });
         }
 
-        const sender = await database.getAccountByToken(token);
-
-        if (sender == null) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
-        const channel = await database.getChannelById(req.params.channelid);
+        const channel = req.channel;
 
         if (channel == null) {
             return res.status(400).json({
@@ -180,20 +177,11 @@ router.patch("/:channelid", globalUtils.channelMiddleware, globalUtils.channelPe
     }
 });
 
-router.get("/:channelid/invites", globalUtils.channelMiddleware, globalUtils.channelPermissionsMiddleware("MANAGE_CHANNELS"), async (req: Request, res: Response) => {
+router.get("/:channelid/invites", globalUtils.channelMiddleware, globalUtils.channelPermissionsMiddleware("MANAGE_CHANNELS"), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
+        const sender = req.account;
 
-        const sender = await database.getAccountByToken(token);
-
-        if (sender == null) {
+        if (!sender || !sender || !sender.token) {
             return res.status(500).json({
                 code: 500,
                 message: "Internal Server Error"
@@ -213,20 +201,11 @@ router.get("/:channelid/invites", globalUtils.channelMiddleware, globalUtils.cha
     }
 });
 
-router.post("/:channelid/invites", globalUtils.channelMiddleware, globalUtils.channelPermissionsMiddleware("CREATE_INSTANT_INVITE"), async (req: Request, res: Response) => {
+router.post("/:channelid/invites", globalUtils.channelMiddleware, globalUtils.channelPermissionsMiddleware("CREATE_INSTANT_INVITE"), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
+        const sender = req.account;
 
-        const sender = await database.getAccountByToken(token);
-
-        if (sender == null) {
+        if (!sender || !sender.token) {
             return res.status(500).json({
                 code: 500,
                 message: "Internal Server Error"
@@ -288,20 +267,11 @@ router.post("/:channelid/invites", globalUtils.channelMiddleware, globalUtils.ch
 
 router.use("/:channelid/messages", globalUtils.channelMiddleware, messages);
 
-router.put("/:channelid/permissions/:id", globalUtils.channelMiddleware, globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"), async (req: Request, res: Response) => {
+router.put("/:channelid/permissions/:id", globalUtils.channelMiddleware, globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
+        const sender = req.account;
 
-        const sender = await database.getAccountByToken(token);
-
-        if (sender == null) {
+        if (!sender || !sender.token) {
             return res.status(500).json({
                 code: 500,
                 message: "Internal Server Error"
@@ -323,7 +293,7 @@ router.put("/:channelid/permissions/:id", globalUtils.channelMiddleware, globalU
             });
         }
         
-        let channel = await database.getChannelById(channel_id);
+        let channel = req.channel;
 
         if (channel == null || !channel.guild_id) {
             return res.status(404).json({
@@ -470,20 +440,11 @@ router.put("/:channelid/permissions/:id", globalUtils.channelMiddleware, globalU
     }
 });
 
-router.delete("/:channelid/permissions/:id", globalUtils.channelMiddleware, globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"), async (req: Request, res: Response) => {
+router.delete("/:channelid/permissions/:id", globalUtils.channelMiddleware, globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
+        const sender = req.account;
 
-        const sender = await database.getAccountByToken(token);
-
-        if (sender == null) {
+        if (!sender || !sender.token) {
             return res.status(500).json({
                 code: 500,
                 message: "Internal Server Error"
@@ -493,7 +454,7 @@ router.delete("/:channelid/permissions/:id", globalUtils.channelMiddleware, glob
         let id = req.params.id;
         let channel_id = req.params.channelid;
         
-        let channel = await database.getChannelById(channel_id);
+        let channel = req.channel;
 
         if (channel == null || !channel.guild_id) {
             return res.status(404).json({
@@ -561,20 +522,11 @@ router.delete("/:channelid/permissions/:id", globalUtils.channelMiddleware, glob
     }
 });
 
-router.delete("/:channelid", globalUtils.channelMiddleware, globalUtils.guildPermissionsMiddleware("MANAGE_CHANNELS"), async (req: Request, res: Response) => {
+router.delete("/:channelid", globalUtils.channelMiddleware, globalUtils.guildPermissionsMiddleware("MANAGE_CHANNELS"), globalUtils.rateLimitMiddleware(5, 1000 * 60 * 60), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
+        const sender = req.account;
 
-        const sender = await database.getAccountByToken(token);
-
-        if (sender == null) {
+        if (!sender || !sender.token) {
             return res.status(500).json({
                 code: 500,
                 message: "Internal Server Error"
@@ -583,7 +535,7 @@ router.delete("/:channelid", globalUtils.channelMiddleware, globalUtils.guildPer
 
         let channel_id = req.params.channelid;
 
-        let channel = await database.getChannelById(channel_id);
+        let channel = req.channel;
 
         if (channel == null) {
             return res.status(404).json({
@@ -606,7 +558,7 @@ router.delete("/:channelid", globalUtils.channelMiddleware, globalUtils.guildPer
                 }
             }
 
-            await gateway.dispatchEventTo(token, {
+            await gateway.dispatchEventTo(sender.token, {
                 op: 0,
                 t: "CHANNEL_DELETE",
                 s: null,

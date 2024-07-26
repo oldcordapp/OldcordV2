@@ -1,14 +1,12 @@
 import * as express from 'express';
 import { Request, Response } from 'express';
 import database from '../../utils/database';
-import { logText } from '../../utils/logger';
-import gateway from '../../gateway';
 import config from '../../utils/config';
 import * as fs from 'fs';
 
 const router = express.Router();
 
-router.get("/statistics", async (req: Request, res: Response) => {
+router.get("/statistics", async (req: any, res: any) => {
     let user_count = await database.getUserCount();
     let server_count = await database.getServerCount();
     let message_count = await database.getMessageCount();
@@ -26,7 +24,7 @@ router.get("/statistics", async (req: Request, res: Response) => {
     })
 });
 
-router.get("/settings", async (req: Request, res: Response) => {
+router.get("/settings", async (req: any, res: any) => {
     let instance_flags: string[] = config.instance_flags;
 
     return res.status(200).json({
@@ -49,7 +47,7 @@ router.get("/settings", async (req: Request, res: Response) => {
     })
 });
 
-router.patch("/settings", async (req: Request, res: Response) => {
+router.patch("/settings", async (req: any, res: any) => {
     let new_config = req.body;
     let instance_flag_str = ``;
 

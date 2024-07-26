@@ -25,9 +25,9 @@ import gateway from '../gateway';
 const configuration = {
     host: 'localhost',
     port: 5433,
-    database: 'db_here',
+    database: 'oldcord_2015',
     user: 'postgres',
-    password: 'pw_here'
+    password: 'oldcord_test'
 }
 
 const pool = new Pool(configuration);
@@ -47,7 +47,10 @@ const database: Database = {
                 values: values
             };
 
+            console.log("executing: " + queryString);
+
             const result = await database.client.query(query);
+
             const rows = result.rows;
 
             if (rows.length === 0) {
@@ -76,16 +79,6 @@ const database: Database = {
                 avatar TEXT DEFAULT NULL,
                 settings TEXT DEFAULT 'INLINE_EMBED_MEDIA:1,INLINE_ATTACHMENT_MEDIA:1,RENDER_EMBEDS:1,ENABLE_TTS_COMMAND:1,THEME:DARK'
             );`, []);
-
-            /*
-            await database.runQuery(`
-            CREATE TABLE IF NOT EXISTS presences (
-                user_id TEXT,
-                guild_id TEXT DEFAULT NULL,
-                game TEXT DEFAULT NULL,
-                status TEXT DEFAULT 'offline'
-            );`, []);
-            */ //why was this needed? all the presences can be handled at runtime, why do they need to be stored - good question for past me
 
             await database.runQuery(`
             CREATE TABLE IF NOT EXISTS channels (
@@ -1877,12 +1870,6 @@ const database: Database = {
             }
 
             let mentions_everyone = content.includes('@everyone') ? 1 : 0;
-
-            let pCheck = await globalUtils.hasChannelPermissionTo(channel_id, author_id, "MENTION_EVERYONE");
-
-            if (!pCheck) {
-                mentions_everyone = 0;
-            }
 
             await database.runQuery(`INSERT INTO messages (guild_id, message_id, channel_id, author_id, content, edited_timestamp, mention_everyone, nonce, timestamp, tts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, [
                 guild_id == null ? 'NULL' : guild_id,

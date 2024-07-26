@@ -15,18 +15,18 @@ const upload = multer();
 
 const router = express.Router({ mergeParams: true });
 
-router.get("/", globalUtils.channelPermissionsMiddleware("READ_MESSAGE_HISTORY"), async (req: Request, res: Response) => {
-    try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
+router.param('messageid', async (req: any, res: any, next: any, messageid: any) => {
+    req.message = await database.getMessageById(messageid);
+    next();
+});
 
-        const creator = await database.getAccountByToken(token);
+router.get("/", globalUtils.channelPermissionsMiddleware("READ_MESSAGE_HISTORY"), async (req: any, res: any) => {
+    try {
+        console.log("called within get messages");
+
+        const creator = req.account;
+
+        console.log(JSON.stringify(creator));
 
         if (creator == null) {
             return res.status(500).json({
@@ -35,7 +35,10 @@ router.get("/", globalUtils.channelPermissionsMiddleware("READ_MESSAGE_HISTORY")
             });
         }
 
-        const channel = await database.getChannelById(req.params.channelid);
+        console.log(req);
+        console.log(req.channel);
+
+        const channel = req.channel;
 
         if (channel == null) {
             return res.status(404).json({
@@ -106,19 +109,9 @@ router.get("/", globalUtils.channelPermissionsMiddleware("READ_MESSAGE_HISTORY")
     }
 });
 
-/*
-router.get("/", globalUtils.channelPermissionsMiddleware("READ_MESSAGE_HISTORY"), async (req: Request, res: Response) => {
+router.post("/", upload.single('file'), globalUtils.channelPermissionsMiddleware("SEND_MESSAGES"), globalUtils.rateLimitMiddleware(200, 1000 * 60 * 5), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
-        const creator = await database.getAccountByToken(token);
+        const creator = req.account;
 
         if (creator == null) {
             return res.status(500).json({
@@ -127,161 +120,7 @@ router.get("/", globalUtils.channelPermissionsMiddleware("READ_MESSAGE_HISTORY")
             });
         }
 
-        const channel = await database.getChannelById(req.params.channelid);
-
-        if (channel == null) {
-            return res.status(404).json({
-                code: 404,
-                message: "Unknown Channel"
-            });
-        }
-
-        if (channel.recipient != null) {
-            const messages: Message[] = await database.getChannelMessages(channel.id);
-    
-            if (messages == null || messages.length == 0) {
-                return res.status(200).json([]);
-            }
-    
-            const ret: Message[] = [];
-    
-            if (req.query.before) {
-                const msg: Message | undefined = messages.find(x => x.id == req.query.before);
-    
-                if (msg != null) {
-                    const index: number = messages.indexOf(msg);
-                    let counter: number = 0;
-    
-                    for (let i = index; i < messages.length; i++) {
-                        if (counter == Number(req.query.limit)) {
-                            break;
-                        }
-                
-                        var message = messages[i];
-                
-                        if (message == null) {
-                            continue;
-                        }
-                
-                        ret.push(message);
-                
-                        counter++;
-                    }
-                }
-    
-                return res.status(200).json(messages);
-            } else {
-                let count: number = 0;
-    
-                for(let msg of messages) {
-                    if (count == Number(req.query.limit)) {
-                        break;
-                    }
-    
-                    if (msg == null) {
-                        continue;
-                    }
-    
-                    ret.push(msg);
-    
-                    count++;
-                }
-            }
-    
-            return res.status(200).json(messages);
-        } else {
-            if (!channel.guild_id) {
-                return res.status(404).json({
-                    code: 404,
-                    message: "Unknown Channel"
-                });
-            }
-    
-            const messages: Message[] = await database.getChannelMessages(channel.id);
-    
-            if (messages == null || messages.length == 0) {
-                return res.status(200).json([]);
-            }
-    
-            const ret: Message[] = [];
-    
-            if (req.query.before) {
-                const msg: Message | undefined = messages.find(x => x.id == req.query.before);
-    
-                if (msg != null) {
-                    const index: number = messages.indexOf(msg);
-                    let counter: number = 0;
-    
-                    for (let i = index; i < messages.length; i++) {
-                        if (counter == Number(req.query.limit)) {
-                            break;
-                        }
-                
-                        var message = messages[i];
-                
-                        if (message == null) {
-                            continue;
-                        }
-                
-                        ret.push(message);
-                
-                        counter++;
-                    }
-                }
-    
-                return res.status(200).json(messages);
-            } else {
-                let count: number = 0;
-    
-                for(let msg of messages) {
-                    if (count == Number(req.query.limit)) {
-                        break;
-                    }
-    
-                    if (msg == null) {
-                        continue;
-                    }
-    
-                    ret.push(msg);
-    
-                    count++;
-                }
-            }
-    
-            return res.status(200).json(messages);
-        }
-      } catch (error: any) {
-        logText(error.toString(), "error");
-    
-        return res.status(500).json({
-          code: 500,
-          message: "Internal Server Error"
-        });
-    }
-});
-*/
-
-router.post("/", upload.single('file'), globalUtils.channelPermissionsMiddleware("SEND_MESSAGES"), async (req: Request, res: Response) => {
-    try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
-        const creator = await database.getAccountByToken(token);
-
-        if (creator == null) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
-        const channel = await database.getChannelById(req.params.channelid);
+        const channel = req.channel;
 
         if (channel == null) {
             return res.status(404).json({
@@ -304,6 +143,14 @@ router.post("/", upload.single('file'), globalUtils.channelPermissionsMiddleware
                     }
                 }
             }
+        }
+
+        if (finalContent.includes("@everyone")) {
+            let pCheck = await globalUtils.hasChannelPermissionTo(req.channel, req.guild, creator.id, "MENTION_EVERYONE");
+
+            if (!pCheck) {
+                finalContent = finalContent.replace(/@everyone/g, "");
+            } 
         }
 
         req.body.content = finalContent;
@@ -393,7 +240,7 @@ router.post("/", upload.single('file'), globalUtils.channelPermissionsMiddleware
             }
 
             if (req.body.tts == true) {
-                let canTts = await globalUtils.hasChannelPermissionTo(channel.id, creator.id, "SEND_TTS_MESSAGES");
+                let canTts = await globalUtils.hasChannelPermissionTo(req.channel, req.guild, creator.id, "SEND_TTS_MESSAGES");
 
                 if (!canTts) {
                     req.body.tts = canTts;
@@ -477,18 +324,9 @@ router.post("/", upload.single('file'), globalUtils.channelPermissionsMiddleware
     }
 });
 
-router.delete("/:messageid", globalUtils.channelPermissionsMiddleware("MANAGE_MESSAGES"), async (req: Request, res: Response) => {
+router.delete("/:messageid", globalUtils.channelPermissionsMiddleware("MANAGE_MESSAGES"), globalUtils.rateLimitMiddleware(50, 1000 * 60 * 60), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(401).json({
-                code: 401,
-                message: "Unauthorized"
-            });
-        }
-        
-        const guy = await database.getAccountByToken(token);
+        const guy = req.account;
 
         if (guy == null) {
             return res.status(401).json({
@@ -497,7 +335,7 @@ router.delete("/:messageid", globalUtils.channelPermissionsMiddleware("MANAGE_ME
             });
         }
 
-        const message = await database.getMessageById(req.params.messageid);
+        const message = req.message;
 
         if (message == null) {
             return res.status(404).json({
@@ -506,7 +344,7 @@ router.delete("/:messageid", globalUtils.channelPermissionsMiddleware("MANAGE_ME
             });
         }
 
-        const channel = await database.getChannelById(req.params.channelid);
+        const channel = req.channel;
 
         if (channel == null) {
             return res.status(500).json({
@@ -585,17 +423,8 @@ router.delete("/:messageid", globalUtils.channelPermissionsMiddleware("MANAGE_ME
     }
 });
 
-router.patch("/:messageid", async (req: Request, res: Response) => {
+router.patch("/:messageid", async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
         if (req.body.content && req.body.content == "") {
             return res.status(403).json({
                 code: 403,
@@ -603,7 +432,7 @@ router.patch("/:messageid", async (req: Request, res: Response) => {
             });
         }
         
-        const guy = await database.getAccountByToken(token);
+        const guy = req.account;
 
         if (guy == null) {
             return res.status(500).json({
@@ -612,7 +441,7 @@ router.patch("/:messageid", async (req: Request, res: Response) => {
             });
         }
 
-        let message = await database.getMessageById(req.params.messageid);
+        let message = req.message;
 
         if (message == null) {
             return res.status(404).json({
@@ -621,7 +450,7 @@ router.patch("/:messageid", async (req: Request, res: Response) => {
             });
         }
 
-        const channel = await database.getChannelById(req.params.channelid);
+        const channel = req.channel;
 
         if (channel == null) {
             return res.status(500).json({

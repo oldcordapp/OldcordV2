@@ -5,20 +5,12 @@ import database from '../utils/database';
 import { logText } from '../utils/logger';
 import globalUtils from '../utils/global';
 
+
 const router = express.Router({ mergeParams: true });
 
-router.get("/regions", async (req: Request, res: Response) => {
+router.get("/regions", async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
-        const sender = await database.getAccountByToken(token);
+        const sender = req.account;
 
         if (sender == null) {
             return res.status(500).json({

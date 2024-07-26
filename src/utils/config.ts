@@ -1,3 +1,4 @@
+/*
 const config = {
     token_secret: "35c8...",
     gateway: "",
@@ -18,13 +19,12 @@ const config = {
     ws_port: 0
 };
 export default config;
-
-/*
+*/
 
 const config = {
     token_secret: "35c8...",
     gateway: "", //Leave as blank for it to use the location ip (if one)
-    use_wss: false,
+    use_wss: true,
     base_url: 'staging_2015.oldcordapp.com',
     local_deploy: false,
     use_same_port: true,
@@ -41,4 +41,4 @@ const config = {
     ws_port: 0 //only need to specify if use_same_port is false 
 };
 
-export default config;*/
+export default config;

@@ -7,18 +7,9 @@ import globalUtils from '../utils/global';
 
 const router = express.Router({ mergeParams: true });
 
-router.get("/:code", async (req: Request, res: Response) => {
+router.get("/:code", async (req: any, res: any) => {
   try {
-    const token = req.headers['authorization'];
-
-    if (!token) {
-      return res.status(401).json({
-        code: 401,
-        message: "Unauthorized"
-      });
-    }
-
-    const sender = await database.getAccountByToken(token);
+    const sender = req.account;
 
     if (sender == null) {
       return res.status(401).json({
@@ -54,24 +45,15 @@ router.get("/:code", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/:code", async (req: Request, res: Response) => {
+router.delete("/:code", globalUtils.rateLimitMiddleware(50, 1000 * 60 * 60), async (req: any, res: any) => {
   try {
-    const token = req.headers['authorization'];
+    const sender = req.account;
 
-    if (!token) {
-      return res.status(401).json({
-        code: 401,
-        message: "Unauthorized"
-    });
-    }
-
-    const sender = await database.getAccountByToken(token);
-
-    if (sender == null) {
-      return res.status(401).json({
-        code: 401,
-        message: "Unauthorized"
-    });
+    if (!sender) {
+      return res.status(500).json({
+        code: 500,
+        message: "Internal Server Error"
+      });
     }
 
     const invite = await database.getInvite(req.params.code);
@@ -92,7 +74,7 @@ router.delete("/:code", async (req: Request, res: Response) => {
       });
     }
 
-    let pCheck = await globalUtils.hasChannelPermissionTo(channel.id, sender.id, "MANAGE_CHANNEL");
+    let pCheck = await globalUtils.hasChannelPermissionTo(req.channel, req.guild, sender.id, "MANAGE_CHANNEL");
 
     if (!pCheck) {
       return res.status(403).json({
@@ -121,20 +103,11 @@ router.delete("/:code", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/:code", globalUtils.instanceMiddleware("NO_INVITE_USE"), async (req: Request, res: Response) => {
+router.post("/:code", globalUtils.instanceMiddleware("NO_INVITE_USE"), globalUtils.rateLimitMiddleware(50, 1000 * 60 * 60), async (req: any, res: any) => {
   try {
-    const token = req.headers['authorization'];
+    const sender = req.account;
 
-    if (!token) {
-      return res.status(401).json({
-        code: 401,
-        message: "Unauthorized"
-      });
-    }
-
-    const sender = await database.getAccountByToken(token);
-
-    if (sender == null) {
+    if (!sender || !sender.token) {
       return res.status(401).json({
         code: 401,
         message: "Unauthorized"
@@ -166,7 +139,7 @@ router.post("/:code", globalUtils.instanceMiddleware("NO_INVITE_USE"), async (re
     delete invite.max_age;
     delete invite.xkcdpass;
 
-    const client = gateway.clients.filter(x => x.token == token)[0];
+    const client = gateway.clients.filter(x => x.token == sender.token)[0];
 
     if (client == null) {
       return res.status(500).json({
@@ -186,7 +159,7 @@ router.post("/:code", globalUtils.instanceMiddleware("NO_INVITE_USE"), async (re
 
     client.sequence++;
 
-    await gateway.dispatchEventTo(token, {
+    await gateway.dispatchEventTo(sender.token, {
       op: 0,
       t: "GUILD_CREATE",
       s: client.sequence,

@@ -114,7 +114,7 @@ const gateway: Gateway = {
             const guildPermCheck = await globalUtils.hasGuildPermissionTo(guild.id, account.id, permission_check);
 
             if (checkChannel && channel != null) {
-                const channelPermCheck = await globalUtils.hasChannelPermissionTo(channel.id, account.id, permission_check);
+                const channelPermCheck = await globalUtils.hasChannelPermissionTo(channel, guild, account.id, permission_check);
 
                 if (!guildPermCheck && !channelPermCheck) {
                     continue;
@@ -185,7 +185,7 @@ const gateway: Gateway = {
         }
 
         for(var member of members) {
-            let permissions = await globalUtils.hasChannelPermissionTo(channel.id, member.id, "READ_MESSAGES");
+            let permissions = await globalUtils.hasChannelPermissionTo(channel, guild, member.id, "READ_MESSAGES");
 
             if (!permissions) {
                 continue;

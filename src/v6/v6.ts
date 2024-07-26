@@ -9,7 +9,7 @@ const router = express.Router({ mergeParams: true });
 
 //router.use("/auth", auth);
 
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", async (req: any, res: any) => {
     return res.status(200).send("OK");
 });
 

@@ -10,7 +10,7 @@ import gateway from '../gateway';
 
 const router = express.Router();
 
-router.post("/register", globalUtils.instanceMiddleware("NO_REGISTRATION"), async (req: Request, res: Response) => {
+router.post("/register", globalUtils.instanceMiddleware("NO_REGISTRATION"), globalUtils.rateLimitMiddleware(5, 1000 * 60 * 60), async (req: any, res: any) => {
   try {
     if (!req.body.email) {
       //return res.status(400).json({
@@ -129,7 +129,7 @@ router.post("/register", globalUtils.instanceMiddleware("NO_REGISTRATION"), asyn
   }
 });
 
-router.post("/login", async (req: Request, res: Response) => {
+router.post("/login", globalUtils.rateLimitMiddleware(50, 1000 * 60 * 60), async (req: any, res: any) => {
   if (!req.body.email) {
     return res.status(400).json({
       code: 400,
@@ -163,11 +163,11 @@ router.post("/login", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/logout", (req: Request, res: Response) => {
+router.post("/logout", (req: any, res: any) => {
   return res.status(204).send();
 });
 
-router.post("/forgot", (req: Request, res: Response) => {
+router.post("/forgot", (req: any, res: any) => {
   return res.status(204).send();
 });
 

@@ -11,17 +11,13 @@ import bans from './bans';
 
 const router = express.Router();
 
-router.post("/", globalUtils.instanceMiddleware("NO_GUILD_CREATION"), async (req: Request, res: Response) => {
-    try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
+router.param('guildid', async (req: any, res: any, next: any, guildid: any) => {
+    req.guild = await database.getGuildById(guildid);
+    next();
+});
 
+router.post("/", globalUtils.instanceMiddleware("NO_GUILD_CREATION"), globalUtils.rateLimitMiddleware(50, 1000 * 60 * 60), async (req: any, res: any) => {
+    try {
         if (!req.body.name || req.body.name == "") {
             return res.status(400).json({
                 name: "This field is required."
@@ -34,9 +30,9 @@ router.post("/", globalUtils.instanceMiddleware("NO_GUILD_CREATION"), async (req
             })
         }
 
-        const creator = await database.getAccountByToken(token);
+        const creator = req.account;
 
-        if (creator == null) {
+        if (!creator || !creator.token) {
             return res.status(500).json({
                 code: 500,
                 message: "Internal Server Error"
@@ -51,7 +47,7 @@ router.post("/", globalUtils.instanceMiddleware("NO_GUILD_CREATION"), async (req
                 message: "Internal Server Error"
             });
         } else {
-            const client = gateway.clients.filter(x => x.token == token)[0];
+            const client = gateway.clients.filter(x => x.token == creator.token)[0];
 
             if (client == null) {
                 return res.status(500).json({
@@ -62,7 +58,7 @@ router.post("/", globalUtils.instanceMiddleware("NO_GUILD_CREATION"), async (req
 
             client.sequence++;
 
-            await gateway.dispatchEventTo(token, {
+            await gateway.dispatchEventTo(creator.token, {
                 op: 0,
                 t: "GUILD_CREATE",
                 s: client.sequence,
@@ -81,27 +77,18 @@ router.post("/", globalUtils.instanceMiddleware("NO_GUILD_CREATION"), async (req
     }
 });
 
-router.delete("/:guildid", globalUtils.guildMiddleware, async (req: Request, res: Response) => {
+router.delete("/:guildid", globalUtils.guildMiddleware, globalUtils.rateLimitMiddleware(50, 1000 * 60 * 60), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
+        const user = req.account;
+
+        if (!user || !user.token) {
             return res.status(401).json({
                 code: 401,
                 message: "Unauthorized"
             });
         }
 
-        const user = await database.getAccountByToken(token);
-
-        if (user == null) {
-            return res.status(401).json({
-                code: 401,
-                message: "Unauthorized"
-            });
-        }
-
-        const guild = await database.getGuildById(req.params.guildid);
+        const guild = req.guild;
 
         if (!guild) {
             return res.status(404).json({
@@ -131,7 +118,7 @@ router.delete("/:guildid", globalUtils.guildMiddleware, async (req: Request, res
 
             return res.status(204).send();
         } else {
-            const client = gateway.clients.filter(x => x.token == token)[0];
+            const client = gateway.clients.filter(x => x.token == user.token)[0];
 
             if (client == null) {
                 return res.status(500).json({
@@ -151,7 +138,7 @@ router.delete("/:guildid", globalUtils.guildMiddleware, async (req: Request, res
                 });
             }
 
-            await gateway.dispatchEventTo(token, {
+            await gateway.dispatchEventTo(user.token, {
                 op: 0,
                 t: "GUILD_DELETE",
                 s: client.sequence,
@@ -188,24 +175,15 @@ router.delete("/:guildid", globalUtils.guildMiddleware, async (req: Request, res
     }
 });
 
-router.patch("/:guildid", globalUtils.guildMiddleware, globalUtils.guildPermissionsMiddleware("MANAGE_GUILD"), async (req: Request, res: Response) => {
+router.patch("/:guildid", globalUtils.guildMiddleware, globalUtils.guildPermissionsMiddleware("MANAGE_GUILD"), globalUtils.rateLimitMiddleware(100, 1000 * 60 * 60), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
         if (req.body.name.length < 2 || req.body.name.length > 30) {
             return res.status(400).json({
                 name: "Must be between 2 and 30 in length."
             })
         }
 
-        const sender = await database.getAccountByToken(token);
+        const sender = req.account;
 
         if (sender == null) {
             return res.status(500).json({
@@ -223,7 +201,7 @@ router.patch("/:guildid", globalUtils.guildMiddleware, globalUtils.guildPermissi
             });
         }
 
-        const what = await database.getGuildById(req.params.guildid);
+        const what = req.guild;
 
         if (what == null) {
             return res.status(500).json({
@@ -250,28 +228,19 @@ router.patch("/:guildid", globalUtils.guildMiddleware, globalUtils.guildPermissi
     }
 });
 
-router.get("/:guildid/prune", async (req: Request, res: Response) => {
+router.get("/:guildid/prune", async (req: any, res: any) => {
     return res.status(200).json([]); //literally cant be fucked rn
 });
 
-router.post("/:guildid/prune", async (req: Request, res: Response) => {
+router.post("/:guildid/prune", async (req: any, res: any) => {
     return res.status(200).json({
         yay: "u did it u pruned the members"
     })
 });
 
-router.get("/:guildid/embed", globalUtils.guildMiddleware, async (req: Request, res: Response) => {
+router.get("/:guildid/embed", globalUtils.guildMiddleware, async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-        
-        const sender = await database.getAccountByToken(token);
+        const sender = req.account;
 
         if (sender == null) {
             return res.status(500).json({
@@ -300,18 +269,9 @@ router.get("/:guildid/embed", globalUtils.guildMiddleware, async (req: Request, 
     }
 });
 
-router.patch("/:guildid/embed", globalUtils.guildMiddleware, globalUtils.guildPermissionsMiddleware("MANAGE_GUILD"), async (req: Request, res: Response) => {
+router.patch("/:guildid/embed", globalUtils.guildMiddleware, globalUtils.guildPermissionsMiddleware("MANAGE_GUILD"), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
-        const sender = await database.getAccountByToken(token);
+        const sender = req.account;
 
         if (sender == null) {
             return res.status(500).json({
@@ -349,18 +309,9 @@ router.patch("/:guildid/embed", globalUtils.guildMiddleware, globalUtils.guildPe
     }
 });
 
-router.get("/:guildid/invites", globalUtils.guildMiddleware, globalUtils.guildPermissionsMiddleware("MANAGE_GUILD"), async (req: Request, res: Response) => {
+router.get("/:guildid/invites", globalUtils.guildMiddleware, globalUtils.guildPermissionsMiddleware("MANAGE_GUILD"), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
-        const sender = await database.getAccountByToken(token);
+        const sender = req.account;
 
         if (sender == null) {
             return res.status(500).json({
@@ -382,18 +333,9 @@ router.get("/:guildid/invites", globalUtils.guildMiddleware, globalUtils.guildPe
     }
 });
 
-router.post("/:guildid/channels", globalUtils.guildMiddleware, globalUtils.guildPermissionsMiddleware("MANAGE_CHANNELS"), async (req: Request, res: Response) => {
+router.post("/:guildid/channels", globalUtils.guildMiddleware, globalUtils.guildPermissionsMiddleware("MANAGE_CHANNELS"), globalUtils.rateLimitMiddleware(100, 1000 * 60 * 60), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
-        const sender = await database.getAccountByToken(token);
+        const sender = req.account;
 
         if (sender == null) {
             return res.status(500).json({
@@ -438,18 +380,9 @@ router.post("/:guildid/channels", globalUtils.guildMiddleware, globalUtils.guild
     }
 });
 
-router.patch("/:guildid/channels", globalUtils.guildMiddleware, globalUtils.guildPermissionsMiddleware("MANAGE_CHANNELS"), async (req: Request, res: Response) => {
+router.patch("/:guildid/channels", globalUtils.guildMiddleware, globalUtils.guildPermissionsMiddleware("MANAGE_CHANNELS"), globalUtils.rateLimitMiddleware(100, 1000 * 60 * 60), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
-        const sender = await database.getAccountByToken(token);
+        const sender = req.account;
 
         if (sender == null) {
             return res.status(500).json({

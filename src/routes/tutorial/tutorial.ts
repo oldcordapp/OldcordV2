@@ -5,27 +5,16 @@ import database from '../../utils/database';
 
 const router = express.Router();
 
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", async (req: any, res: any) => {
   try {
-    const token = req.headers['authorization'];
-
-    if (token == null) {
+    if (!req.account) {
         return res.status(500).json({
             code: 500,
             message: "Internal Server Error"
-        });
+          });
     }
-
-    const user = await database.getAccountByToken(token);
-
-    if (user == null) {
-        return res.status(500).json({
-            code: 500,
-            message: "Internal Server Error"
-        });
-    }
-
-    const tutorial = await database.getTutorial(user.id);
+    
+    const tutorial = await database.getTutorial(req.account.id);
 
     if (tutorial == null) {
         return res.status(200).json({
@@ -45,27 +34,16 @@ router.get("/", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/indicators/suppress", async (req: Request, res: Response) => {
+router.post("/indicators/suppress", async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (token == null) {
+        if (!req.account) {
             return res.status(500).json({
                 code: 500,
                 message: "Internal Server Error"
-            });
-        }
-    
-        const user = await database.getAccountByToken(token);
-    
-        if (user == null) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
+              });
         }
 
-        const tutorial = await database.getTutorial(user.id);
+        const tutorial = await database.getTutorial(req.account.id);
 
         if (tutorial == null) {
             return res.status(500).json({
@@ -80,7 +58,7 @@ router.post("/indicators/suppress", async (req: Request, res: Response) => {
 
         let confirmed = tutorial.indicators_confirmed;
 
-        let attempt = await database.updateTutorial(user.id, true, confirmed);
+        let attempt = await database.updateTutorial(req.account.id, true, confirmed);
 
         if (!attempt) {
             return res.status(500).json({
@@ -103,27 +81,16 @@ router.post("/indicators/suppress", async (req: Request, res: Response) => {
     }
 });
 
-router.put("/indicators/:indicator", async (req: Request, res: Response) => {
+router.put("/indicators/:indicator", async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (token == null) {
+        if (!req.account) {
             return res.status(500).json({
                 code: 500,
                 message: "Internal Server Error"
-            });
-        }
-    
-        const user = await database.getAccountByToken(token);
-    
-        if (user == null) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
+              });
         }
 
-        const tutorial = await database.getTutorial(user.id);
+        const tutorial = await database.getTutorial(req.account.id);
 
         if (tutorial == null) {
             return res.status(500).json({
@@ -160,7 +127,7 @@ router.put("/indicators/:indicator", async (req: Request, res: Response) => {
 
         confirmed.push(req.params.indicator.toLowerCase());
 
-        let attempt = await database.updateTutorial(user.id, tutorial.indicators_suppressed, confirmed);
+        let attempt = await database.updateTutorial(req.account.id, tutorial.indicators_suppressed, confirmed);
 
         if (!attempt) {
             return res.status(500).json({

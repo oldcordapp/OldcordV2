@@ -5,20 +5,17 @@ import database from '../utils/database';
 import { logText } from '../utils/logger';
 import globalUtils from '../utils/global';
 
+
 const router = express.Router({ mergeParams: true });
 
-router.patch("/:roleid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"), async (req: Request, res: Response) => {
-    try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
+router.param('roleid', async (req: any, res: any, next: any, roleid: any) => {
+    req.role = await database.getRoleById(roleid);
+    next();
+});
 
-        const sender = await database.getAccountByToken(token);
+router.patch("/:roleid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"), globalUtils.rateLimitMiddleware(100, 1000 * 60 * 60), async (req: any, res: any) => {
+    try {
+        const sender = req.account;
 
         if (sender == null) {
             return res.status(500).json({
@@ -36,7 +33,7 @@ router.patch("/:roleid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"),
             });
         }
 
-        let role = await database.getRoleById(req.params.roleid);
+        let role = req.role;
 
         if (role == null) {
             return res.status(400).json({
@@ -84,18 +81,9 @@ router.patch("/:roleid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"),
     }
 });
 
-router.delete("/:roleid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"), async (req: Request, res: Response) => {
+router.delete("/:roleid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"), globalUtils.rateLimitMiddleware(100, 1000 * 60 * 60), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(401).json({
-                code: 401,
-                message: "Unauthorized"
-            });
-        }
-
-        const sender = await database.getAccountByToken(token);
+        const sender = req.account;
 
         if (sender == null) {
             return res.status(401).json({
@@ -104,7 +92,7 @@ router.delete("/:roleid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES")
             });
         }
 
-        let role = await database.getRoleById(req.params.roleid);
+        let role = req.role;
 
         if (role == null) {
             return res.status(400).json({
@@ -143,18 +131,9 @@ router.delete("/:roleid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES")
     }
 });
 
-router.post("/", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"), async (req: Request, res: Response) => {
+router.post("/", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"), globalUtils.rateLimitMiddleware(100, 1000 * 60 * 60), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(401).json({
-                code: 401,
-                message: "Unauthorized"
-            });
-        }
-
-        const sender = await database.getAccountByToken(token);
+        const sender = req.account;
 
         if (sender == null) {
             return res.status(401).json({

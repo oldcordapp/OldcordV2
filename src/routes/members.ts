@@ -8,18 +8,14 @@ import Role from '../interfaces/guild/role';
 
 const router = express.Router({ mergeParams: true });
 
-router.delete("/:userid", globalUtils.guildPermissionsMiddleware("KICK_MEMBERS"), async (req: Request, res: Response) => {
-    try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(401).json({
-                code: 401,
-                message: "Unauthorized"
-            });
-        }
+router.param('userid', async (req: any, res: any, next: any, userid: any) => {
+    req.user = await database.getAccountByUserId(userid);
+    next();
+});
 
-        const sender = await database.getAccountByToken(token);
+router.delete("/:userid", globalUtils.guildPermissionsMiddleware("KICK_MEMBERS"), globalUtils.rateLimitMiddleware(200, 1000 * 60 * 60), async (req: any, res: any) => {
+    try {
+        const sender = req.account;
 
         if (sender == null) {
             return res.status(401).json({
@@ -28,7 +24,7 @@ router.delete("/:userid", globalUtils.guildPermissionsMiddleware("KICK_MEMBERS")
             });
         }
 
-        const member = await database.getGuildMemberById(req.params.guildid, req.params.userid);
+        const member = req.user;
 
         if (member == null) {
             return res.status(404).json({
@@ -88,18 +84,9 @@ router.delete("/:userid", globalUtils.guildPermissionsMiddleware("KICK_MEMBERS")
     }
 });
 
-router.patch("/:userid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"), async (req: Request, res: Response) => {
+router.patch("/:userid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"), globalUtils.rateLimitMiddleware(200, 1000 * 60 * 60), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(401).json({
-                code: 401,
-                message: "Unauthorized"
-            });
-        }
-
-        const sender = await database.getAccountByToken(token);
+        const sender = req.account;
 
         if (sender == null) {
             return res.status(401).json({
@@ -108,7 +95,7 @@ router.patch("/:userid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"),
             });
         }
 
-        const member = await database.getGuildMemberById(req.params.guildid, req.params.userid);
+        const member = req.user;
 
         if (member == null) {
             return res.status(404).json({

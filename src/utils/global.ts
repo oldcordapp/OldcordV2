@@ -11,6 +11,7 @@ import * as path from 'path';
 import { Request, Response } from 'express';
 import gateway from '../gateway';
 import Presence from '../interfaces/presence';
+import rateLimit from 'express-rate-limit';
 
 const globalUtils = {
     generateString(length: number) {
@@ -86,11 +87,8 @@ const globalUtils = {
 
         return partTwo;
     },
-    checkToken(token: string) {
-        return database.getAccountByToken(token) != null;
-    },
-    async channelMiddleware(req: Request, res: Response, next: any) {
-        let channel = await database.getChannelById(req.params.channelid);
+    async channelMiddleware(req: any, res: any, next: any) {
+        let channel = req.channel;
 
         if (!channel) {
             return res.status(400).json({
@@ -107,16 +105,7 @@ const globalUtils = {
             req.params.guildid = channel.guild_id;
         }
 
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
-        const sender = await database.getAccountByToken(token);
+        const sender = req.account;
 
         if (sender == null) {
             return res.status(500).json({
@@ -134,7 +123,7 @@ const globalUtils = {
             });
         }
 
-        let gCheck = await globalUtils.hasGuildPermissionTo(channel.guild_id, member.id, "READ_MESSAGES");
+        let gCheck = await globalUtils.hasGuildPermissionTo(req.guild, member.id, "READ_MESSAGES");
 
         if (!gCheck) {
             return res.status(403).json({
@@ -143,7 +132,7 @@ const globalUtils = {
             });
         }
 
-        let pCheck = await globalUtils.hasChannelPermissionTo(channel.id, member.id, "READ_MESSAGES");
+        let pCheck = await globalUtils.hasChannelPermissionTo(req.channel, req.guild, member.id, "READ_MESSAGES");
 
         if (!pCheck) {
             return res.status(403).json({
@@ -175,7 +164,7 @@ const globalUtils = {
         return ret;
     },
     instanceMiddleware(flag_check: string) {
-        return function (req: Request, res: Response, next: any) {
+        return function (req: any, res: any, next: any) {
             let check = config.instance_flags.includes(flag_check);
 
             if (check) {
@@ -188,18 +177,30 @@ const globalUtils = {
             return next();
         }
     },
-    guildPermissionsMiddleware(permission: string) {
-        return async function (req: Request, res: Response, next: any) {
-            const token = req.headers['authorization'];
+    rateLimitMiddleware(max: number, windowMs: number) {
+        const rL = rateLimit({
+            windowMs: windowMs,
+            max: max,
+            handler: (req: any, res: any) => {
+                const retryAfter = Math.ceil((req.rateLimit.resetTime.getTime() - Date.now()));
     
-            if (!token) {
-                return res.status(401).json({
-                    code: 401,
-                    message: "Unauthorized"
+                res.status(429).json({
+                    message: "You are being rate limited.",
+                    retry_after: retryAfter,
+                    global: true
                 });
             }
-
-            const sender = await database.getAccountByToken(token);
+        });
+    
+        return async function (req: any, res: any, next: any) {
+            rL(req, res, () => {
+                next();
+            });
+        }
+    },
+    guildPermissionsMiddleware(permission: string) {
+        return async function (req: any, res: any, next: any) {
+            const sender = req.account;
 
             if (sender == null) {
                 return res.status(401).json({
@@ -212,7 +213,7 @@ const globalUtils = {
                 return next(); //dm channel
             }
 
-            const guild = await database.getGuildById(req.params.guildid);
+            const guild = req.guild;
 
             if (guild == null) {
                 return res.status(404).json({
@@ -225,7 +226,7 @@ const globalUtils = {
                 return next();
             }
 
-            let check = await globalUtils.hasGuildPermissionTo(req.params.guildid, sender.id, permission);
+            let check = await globalUtils.hasGuildPermissionTo(req.guild, sender.id, permission);
 
             if (!check) {
                 return res.status(403).json({
@@ -238,17 +239,10 @@ const globalUtils = {
         }
     },
     channelPermissionsMiddleware(permission: string) {
-        return async function (req: Request, res: Response, next: any) {
-            const token = req.headers['authorization'];
-    
-            if (!token) {
-                return res.status(500).json({
-                    code: 500,
-                    message: "Internal Server Error"
-                });
-            }
+        return async function (req: any, res: any, next: any) {
+            console.log("called within channel permissions middleware");
 
-            const sender = await database.getAccountByToken(token);
+            const sender = req.account;
 
             if (sender == null) {
                 return res.status(500).json({
@@ -258,7 +252,7 @@ const globalUtils = {
             }
 
             if (permission == "MANAGE_MESSAGES" && req.params.messageid) {
-                let message = await database.getMessageById(req.params.messageid);
+                let message = req.message;
 
                 if (message == null) {
                     return res.status(400).json({
@@ -272,11 +266,11 @@ const globalUtils = {
                 }
             }
 
-            let channelid = req.params.channelid;
-
-            const channel = await database.getChannelById(channelid);
+            const channel = req.channel;
 
             if (channel == null) {
+                console.log("channel permissions middleware issue");
+
                 return res.status(400).json({
                     code: 400,
                     message: "Unknown Channel"
@@ -294,7 +288,7 @@ const globalUtils = {
                 return next();
             }
 
-            let check = await globalUtils.hasChannelPermissionTo(channelid, sender.id, permission);
+            let check = await globalUtils.hasChannelPermissionTo(channel, req.guild, sender.id, permission);
 
             if (!check) {
                 return res.status(403).json({
@@ -306,12 +300,12 @@ const globalUtils = {
             return next();
         }
     },
-    async guildMiddleware(req: Request, res: Response, next: any) {
+    async guildMiddleware(req: any, res: any, next: any) {
         if (!req.params.guildid) {
             return next();
         }
 
-        let guild = await database.getGuildById(req.params.guildid);
+        let guild = req.guild;
 
         if (!guild) {
             return res.status(400).json({
@@ -320,16 +314,7 @@ const globalUtils = {
             });
         }
 
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
-        const sender = await database.getAccountByToken(token);
+        const sender = req.account;
 
         if (sender == null) {
             return res.status(500).json({
@@ -360,9 +345,8 @@ const globalUtils = {
 
         return members.filter(x => x.id == user_id).length > 0;
     },
-    async hasGuildPermissionTo(guild_id: string, user_id: string, key: string) {
-        const member = await database.getGuildMemberById(guild_id, user_id);
-        const guild = await database.getGuildById(guild_id);
+    async hasGuildPermissionTo(guild: any, user_id: string, key: string) {
+        const member = await database.getGuildMemberById(guild.id, user_id);
 
         if (guild == null) {
             return false;
@@ -446,14 +430,10 @@ const globalUtils = {
 
         return true;
     },
-    async hasChannelPermissionTo(channel_id: string, user_id: string, key: string) {
-        const channel = await database.getChannelById(channel_id);
-
+    async hasChannelPermissionTo(channel: any, guild: any, user_id: string, key: string) {
         if (channel == null || !channel.guild_id) {
             return false;
         }
-
-        const guild = await database.getGuildById(channel.guild_id);
 
         if (guild == null) {
             return false;

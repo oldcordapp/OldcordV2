@@ -3,23 +3,15 @@ import { Request, Response } from 'express';
 import database from '../../utils/database';
 import { logText } from '../../utils/logger';
 import gateway from '../../gateway';
+import globalUtils from '../../utils/global';
 
 const router = express.Router();
 
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", async (req: any, res: any) => {
   try {
-    const token = req.headers['authorization'];
+    let account = req.account;
 
-    if (!token) {
-      return res.status(500).json({
-        code: 500,
-        message: "Internal Server Error"
-      });
-    }
-
-    const account = await database.getAccountByToken(token);
-
-    if (account == null) {
+    if (!account) {
       return res.status(500).json({
         code: 500,
         message: "Internal Server Error"
@@ -42,20 +34,11 @@ router.get("/", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/settings", async (req: Request, res: Response) => {
+router.get("/settings", async (req: any, res: any) => {
   try {
-    const token = req.headers['authorization'];
+    let account = req.account;
 
-    if (!token) {
-      return res.status(500).json({
-        code: 500,
-        message: "Internal Server Error"
-      });
-    }
-
-    const account = await database.getAccountByToken(token);
-
-    if (account == null) {
+    if (!account) {
       return res.status(500).json({
         code: 500,
         message: "Internal Server Error"
@@ -79,23 +62,21 @@ router.get("/settings", async (req: Request, res: Response) => {
   }
 });
 
-router.patch("/", async (req: Request, res: Response) => {
+router.patch("/", globalUtils.rateLimitMiddleware(5, 1000 * 60 * 60), async (req: any, res: any) => {
   try {
-    const token = req.headers['authorization'];
+    let account = req.account;
 
-    if (!token) {
-      return res.status(401).json({
-        code: 401,
-        message: "Unauthorized"
+    if (!account) {
+      return res.status(500).json({
+        code: 500,
+        message: "Internal Server Error"
       });
     }
 
-    let account = await database.getAccountByToken(token);
-
-    if (account == null || !account.email || !account.password || !account.token) {
-      return res.status(401).json({
-        code: 401,
-        message: "Unauthorized"
+    if (!account.email || !account.token || !account.password) {
+      return res.status(500).json({
+        code: 500,
+        message: "Internal Server Error"
       });
     }
 
@@ -126,14 +107,14 @@ router.patch("/", async (req: Request, res: Response) => {
       const attemptToUpdateAvi = await database.updateAccount(update_object.avatar, account.email, account.username, null, null, null);
 
       if (attemptToUpdateAvi) {
-        account = await database.getAccountByEmail(account.email);
+        let account2 = await database.getAccountByEmail(account.email);
 
-        if (account != null) {
+        if (account2 != null) {
           delete account.password;
           delete account.settings;
           delete account.created_at;
 
-          await gateway.dispatchEventTo(token, {
+          await gateway.dispatchEventTo(account.token, {
             t: "USER_UPDATE",
             op: 0,
             s: null,
@@ -202,14 +183,14 @@ router.patch("/", async (req: Request, res: Response) => {
         const update = await database.updateAccount(update_object.avatar, account.email, update_object.username, update_object.password, update_object.new_password, update_object.email);
 
         if (update) {
-          account = await database.getAccountByEmail(update_object.email);
+          let account2 = await database.getAccountByEmail(update_object.email);
   
-          if (account != null) {
+          if (account2 != null) {
             delete account.settings;
             delete account.password;
             delete account.created_at;
   
-            await gateway.dispatchEventTo(token, {
+            await gateway.dispatchEventTo(account.token, {
               t: "USER_UPDATE",
               op: 0,
               s: null,
@@ -240,24 +221,15 @@ router.patch("/", async (req: Request, res: Response) => {
   }
 });
 
-router.patch("/settings", async (req: Request, res: Response) => {
+router.patch("/settings", async (req: any, res: any) => {
   try {
-    const token = req.headers['authorization'];
+    let account = req.account;
 
-    if (!token) {
+    if (!account || !account.token) {
       return res.status(500).json({
         code: 500,
         message: "Internal Server Error"
-      });
-    }
-
-    let account = await database.getAccountByToken(token);
-
-    if (account == null) {
-      return res.status(500).json({
-        code: 500,
-        message: "Internal Server Error"
-      });
+      }); 
     }
 
     let new_settings = account.settings;
@@ -295,7 +267,7 @@ router.patch("/settings", async (req: Request, res: Response) => {
         theme: new_settings.includes("THEME:DARK") ? "dark" : "light"
       }
 
-      gateway.dispatchEventTo(token, {
+      gateway.dispatchEventTo(account.token, {
         t: "USER_SETTINGS_UPDATE",
         op: 0,
         s: null,

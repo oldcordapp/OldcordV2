@@ -1,7 +1,3 @@
-import * as dotenv from 'dotenv'
-
-dotenv.config();
-
 import * as express from 'express';
 import { Request, Response } from 'express';
 import auth from './routes/auth';
@@ -32,6 +28,8 @@ import admin from './routes/admin/admin';
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 let version = "september_2_2015"; //september_2_2015 for second oldest build of 2015
 
 app.use(express.json());
@@ -40,21 +38,6 @@ app.use(cookieParser());
 
 app.use(cors());
 
-app.use((err: any, req: Request, res: Response, next: any) => {
-    logText(`[${req.method}] -> ${req.url}`, "debug");
-
-    let token = req.headers['authorization'];
-
-    if (!token || !globalUtils.checkToken(token)) {
-        return res.status(401).json({
-            code: 401,
-            message: "Unauthorized"
-        });
-    }
-
-    next();
-});
-
 app.use('/assets', express.static(__dirname + '/assets'));
 app.use('/assets', express.static(__dirname + '/assets/2015'));
 app.use('/assets', express.static(__dirname + '/assets/2016'));
@@ -62,6 +45,48 @@ app.use('/assets', express.static(__dirname + '/assets/2017'));
 app.use('/icons/', express.static(__dirname + '/user_assets/icons'));
 app.use('/avatars/', express.static(__dirname + '/user_assets/avatars'));
 app.use('/attachments/', express.static(__dirname + '/user_assets/attachments'));
+
+app.use(async (req: any, res: any, next: any) => {
+    try {
+        if (!req.url.includes("/api/")) {
+            return next();
+        }
+
+        let token = req.headers['authorization'];
+        
+        if (!token) {
+            return res.status(401).json({
+                code: 401,
+                message: "Unauthorized"
+            });
+        }
+
+        let account = await database.getAccountByToken(token);
+    
+        if (!account) {
+            return res.status(401).json({
+                code: 401,
+                message: "Unauthorized"
+            });
+        }
+    
+        req.account = account;
+
+        next();
+    }
+    catch(err: any) {
+        console.log(err.toString());
+
+        return res.status(500).json({
+            code: 500,
+            message: "Internal Server Error"
+        });
+    }
+});
+
+app.use(globalUtils.rateLimitMiddleware(25, 10 * 1000));
+app.use(globalUtils.rateLimitMiddleware(100, 1 * 60 * 1000));
+app.use(globalUtils.rateLimitMiddleware(1000, 60 * 60 * 1000));
 
 let cached404s = {};
 
@@ -78,7 +103,7 @@ function convertTimestampToCustomFormat(timestamp) {
     return `${year}${month}${day}${hours}${minutes}${seconds}`;
 }
 
-app.get("/assets/:asset", async (req: Request, res: Response) => {
+app.get("/assets/:asset", async (req: any, res: any) => {
     let release = req.cookies['release_date'];
     
     if (!release) {
@@ -103,6 +128,7 @@ app.get("/assets/:asset", async (req: Request, res: Response) => {
         console.log(`https://discordapp.com/assets/${req.params.asset}`);
 
         let timestamps = await waybackmachine.getTimestamps(`https://discordapp.com/assets/${req.params.asset}`);
+        let isOldBucket: boolean = false;
 
         if (timestamps == null || timestamps.first_ts.includes("1999")) {
             timestamps = await waybackmachine.getTimestamps(`https://d3dsisomax34re.cloudfront.net/assets/${req.params.asset}`);
@@ -112,11 +138,16 @@ app.get("/assets/:asset", async (req: Request, res: Response) => {
 
                 return res.status(404).send("File not found");
             }
+
+            isOldBucket = true;
         }
 
         let timestamp = timestamps.first_ts;
+        let snapshot_url = ``;
 
-        let snapshot_url = `https://web.archive.org/web/${timestamp}im_/https://discordapp.com/assets/${req.params.asset}`;
+        if (isOldBucket) {
+            snapshot_url = `https://web.archive.org/web/${timestamp}im_/https://d3dsisomax34re.cloudfront.net/assets/${req.params.asset}`;
+        } else snapshot_url = `https://web.archive.org/web/${timestamp}im_/https://discordapp.com/assets/${req.params.asset}`;
 
         request(snapshot_url, { encoding: null }, (err, resp, body) => {
             if (err) {
@@ -128,16 +159,18 @@ app.get("/assets/:asset", async (req: Request, res: Response) => {
             if (snapshot_url.endsWith(".js")) {
                 let str = Buffer.from(body).toString("utf-8");
 
-                str = str.replace("cdn.discordapp.com", (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
-                str = str.replace(`n="discord.gg"`, `n="${(config.local_deploy ? config.base_url + ":" + config.port : config.base_url) + "/invites"}"`);
-                str = str.replace("discord.gg", (config.local_deploy ? config.base_url + ":" + config.port : config.base_url) + "/invites");
-                str = str.replace(`"discord.gg"`, `"${(config.local_deploy ? config.base_url + ":" + config.port : config.base_url)}/invites"`);
-                str = str.replace("d3dsisomax34re.cloudfront.net", (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
+                str = str.replace(/cdn.discordapp.com/g, (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
+                str = str.replace(/discord.gg/g, (config.local_deploy ? config.base_url + ":" + config.port : config.base_url) + "/invites");
+                str = str.replace(/d3dsisomax34re.cloudfront.net/g, (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
                 str = str.replace(/discordapp.com/g, (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
 
-                //if (req.params.asset.toLowerCase().includes('a872e2bb95aa9d365050.js')) {
-                //    str = str.replace(`var l=t.roles.get(a.roles[s]);i|=l.permissions`, `var l=t.roles.get(a.roles[s]);if (l!=undefined)i|=l.permissions`);
-                //} else if (req.params.asset.toLowerCase().includes('a872e2bb95aa9d365050.js'))
+                body = Buffer.from(str);
+
+                fs.writeFileSync(`./assets/${year}/${req.params.asset}`, str, "utf-8");
+            } else if (snapshot_url.endsWith(".css") && snapshot_url.includes("201508")) {
+                let str = Buffer.from(body).toString("utf-8");
+
+                str = str.replace(/d3dsisomax34re.cloudfront.net/g, (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
 
                 body = Buffer.from(str);
 
@@ -165,17 +198,17 @@ app.use("/api/guilds", guilds);
 app.use("/api/channels", channels);
 app.use("/api/invite", invites);
 
-app.post("/api/track", (req: Request, res: Response) => {
+app.post("/api/track", (req: any, res: any) => {
     return res.status(204).send();
 });
 
-app.get("/api/gateway", (req: Request, res: Response) => {
+app.get("/api/gateway", (req: any, res: any) => {
     return res.status(200).json({
         url: `${config.use_wss ? 'wss' : 'ws'}://${config.gateway == "" ? req.headers['host']?.split(':')[0] : config.gateway}${config.gateway_has_no_port ? '' : `:${config.use_same_port ? config.port : config.ws_port}`}`
     });
 });
 
-app.get("/api/servers/:guildid/widget.json", async (req: Request, res: Response) => {
+app.get("/api/servers/:guildid/widget.json", async (req: any, res: any) => {
     try {
         const guild = await database.getGuildById(req.params.guildid);
 
@@ -309,7 +342,7 @@ app.get("/api/servers/:guildid/widget.json", async (req: Request, res: Response)
     }
 });
 
-app.get("/widget", async (req: Request, res: Response) => {
+app.get("/widget", async (req: any, res: any) => {
     try {
         if (!req.query.id) {
             return res.status(404).json({
@@ -347,7 +380,7 @@ app.get("/widget", async (req: Request, res: Response) => {
     }
 });
 
-app.get("/invite/:code", async (req: Request, res: Response) => {
+app.get("/invite/:code", async (req: any, res: any) => {
     let release = req.cookies['release_date'];
     
     if (!release) {
@@ -359,11 +392,11 @@ app.get("/invite/:code", async (req: Request, res: Response) => {
     return res.send(fs.readFileSync(`./assets/${year}/${version}/invite.html`, 'utf8'));
 });
 
-app.get("/selector", (req: Request, res: Response) => {
-    res.send(fs.readFileSync(`./assets/selector/selector.html`, 'utf8'));
-});
+//app.get("/selector", (req: any, res: any) => {
+    //res.send(fs.readFileSync(`./assets/selector/selector.html`, 'utf8'));
+//}); no longer needed
 
-app.get("/launch", (req: Request, res: Response) => {
+app.get("/launch", (req: any, res: any) => {
     if (!req.query.release_date) {
         req.query.release_date = "september_2_2015";
     }
@@ -373,11 +406,11 @@ app.get("/launch", (req: Request, res: Response) => {
     res.redirect("/");
 });
 
-app.get("/channels/:guildid/:channelid", (req: Request, res: Response) => {
+app.get("/channels/:guildid/:channelid", (req: any, res: any) => {
     res.redirect("/"); //temp fix - this wont trigger when using the client normally but when you refresh, it will.
 });
 
-app.get("*", (req: Request, res: Response) => {
+app.get("*", (req: any, res: any) => {
     if (!req.cookies['release_date']) {
         res.redirect("/selector");
     } else {

@@ -9,15 +9,20 @@ import Channel from '../../interfaces/guild/channel';
 import * as path from 'path';
 import Guild from '../../interfaces/guild';
 import Member from '../../interfaces/guild/member';
+import globalUtils from '../../utils/global';
+
 const router = express.Router();
+
+router.param('userid', async (req: any, res: any, next: any, userid: any) => {
+    req.user = await database.getAccountByUserId(userid);
+    next();
+});
 
 router.use("/@me", me);
 
-router.get("/:userid/avatars/:file", async (req: Request, res: Response) => {
+router.get("/:userid/avatars/:file", async (req: any, res: any) => {
     try {
-        const user = await database.getAccountByUserId(req.params.userid);
-
-        if (user == null) {
+        if (req.user == null) {
             return res.status(404).json({
                 code: 404,
                 message: "Unknown User"
@@ -42,24 +47,15 @@ router.get("/:userid/avatars/:file", async (req: Request, res: Response) => {
     }
 });
 
-router.post("/:userid/channels", async (req: Request, res: Response) => {
+router.post("/:userid/channels", globalUtils.rateLimitMiddleware(100, 1000 * 60 * 60), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
+        const account = req.account;
 
-        if (!token) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
-        }
-
-        const account = await database.getAccountByToken(token);
-
-        if (account == null) {
-            return res.status(500).json({
-                code: 500,
-                message: "Internal Server Error"
-            });
+        if (!account) {
+          return res.status(500).json({
+            code: 500,
+            message: "Internal Server Error"
+          });
         }
 
         const user = await database.getAccountByUserId(req.body.recipient_id);

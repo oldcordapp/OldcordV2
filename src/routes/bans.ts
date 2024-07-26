@@ -7,20 +7,17 @@ import globalUtils from '../utils/global';
 import Ban from '../interfaces/guild/ban';
 import Message from '../interfaces/guild/message';
 
+
 const router = express.Router({ mergeParams: true });
 
-router.get("/", globalUtils.guildPermissionsMiddleware("BAN_MEMBERS"), async (req: Request, res: Response) => {
-    try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(401).json({
-                code: 401,
-                message: "Unauthorized"
-            });
-        }
+router.param('memberid', async (req: any, res: any, next: any, memberid: any) => {
+    req.member = await database.getGuildMemberById(req.params.guildid, memberid);
+    next();
+});
 
-        const sender = await database.getAccountByToken(token);
+router.get("/", globalUtils.guildPermissionsMiddleware("BAN_MEMBERS"), async (req: any, res: any) => {
+    try {
+        const sender = req.account;
 
         if (sender == null) {
             return res.status(401).json({
@@ -42,20 +39,11 @@ router.get("/", globalUtils.guildPermissionsMiddleware("BAN_MEMBERS"), async (re
     }
 });
 
-router.put("/:memberid", globalUtils.guildPermissionsMiddleware("BAN_MEMBERS"), async (req: Request, res: Response) => {
+router.put("/:memberid", globalUtils.guildPermissionsMiddleware("BAN_MEMBERS"), globalUtils.rateLimitMiddleware(100, 1000 * 60 * 60), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(401).json({
-                code: 401,
-                message: "Unauthorized"
-            });
-        }
+        const sender = req.account;
 
-        const sender = await database.getAccountByToken(token);
-
-        if (sender == null) {
+        if (!sender || !sender.token) {
             return res.status(401).json({
                 code: 401,
                 message: "Unauthorized"
@@ -69,7 +57,7 @@ router.put("/:memberid", globalUtils.guildPermissionsMiddleware("BAN_MEMBERS"), 
             });
         }
 
-        const member = await database.getGuildMemberById(req.params.guildid, req.params.memberid);
+        const member = req.member;
 
         if (member == null) {
             return res.status(404).json({
@@ -118,7 +106,7 @@ router.put("/:memberid", globalUtils.guildPermissionsMiddleware("BAN_MEMBERS"), 
             }
         });
 
-        await gateway.dispatchEventTo(token, {
+        await gateway.dispatchEventTo(sender.token, {
             op: 0,
             t: "GUILD_BAN_ADD",
             s: null,
@@ -187,20 +175,11 @@ router.put("/:memberid", globalUtils.guildPermissionsMiddleware("BAN_MEMBERS"), 
     }
 });
 
-router.delete("/:memberid", globalUtils.guildPermissionsMiddleware("BAN_MEMBERS"), async (req: Request, res: Response) => {
+router.delete("/:memberid", globalUtils.guildPermissionsMiddleware("BAN_MEMBERS"), globalUtils.rateLimitMiddleware(100, 1000 * 60 * 60), async (req: any, res: any) => {
     try {
-        const token = req.headers['authorization'];
-    
-        if (!token) {
-            return res.status(401).json({
-                code: 401,
-                message: "Unauthorized"
-            });
-        }
+        const sender = req.account;
 
-        const sender = await database.getAccountByToken(token);
-
-        if (sender == null) {
+        if (!sender || !sender.token) {
             return res.status(401).json({
                 code: 401,
                 message: "Unauthorized"
@@ -234,7 +213,7 @@ router.delete("/:memberid", globalUtils.guildPermissionsMiddleware("BAN_MEMBERS"
             });
         }
 
-        await gateway.dispatchEventTo(token, {
+        await gateway.dispatchEventTo(sender.token, {
             op: 0,
             t: "GUILD_BAN_REMOVE",
             s: null,
