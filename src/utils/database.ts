@@ -22,15 +22,9 @@ import Invite from '../interfaces/guild/invite';
 import config from './config';
 import gateway from '../gateway';
 
-const configuration = {
-    host: 'localhost',
-    port: 5433,
-    database: 'oldcord_2015',
-    user: 'postgres',
-    password: 'oldcord_test'
-}
+let db_config: any = JSON.stringify(fs.readFileSync("./db_config.json"));
 
-const pool = new Pool(configuration);
+const pool = new Pool(db_config);
 
 const database: Database = {
     client: null,
