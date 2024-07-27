@@ -91,8 +91,8 @@ const globalUtils = {
         let channel = req.channel;
 
         if (!channel) {
-            return res.status(400).json({
-                code: 400,
+            return res.status(404).json({
+                code: 404,
                 message: "Unknown Channel"
             });
         }
@@ -240,7 +240,7 @@ const globalUtils = {
     },
     channelPermissionsMiddleware(permission: string) {
         return async function (req: any, res: any, next: any) {
-            console.log("called within channel permissions middleware");
+            //console.log("called within channel permissions middleware");
 
             const sender = req.account;
 
@@ -255,8 +255,8 @@ const globalUtils = {
                 let message = req.message;
 
                 if (message == null) {
-                    return res.status(400).json({
-                        code: 400,
+                    return res.status(404).json({
+                        code: 404,
                         message: "Unknown Message"
                     });
                 }
@@ -269,10 +269,10 @@ const globalUtils = {
             const channel = req.channel;
 
             if (channel == null) {
-                console.log("channel permissions middleware issue");
+                //console.log("channel permissions middleware issue");
 
-                return res.status(400).json({
-                    code: 400,
+                return res.status(404).json({
+                    code: 404,
                     message: "Unknown Channel"
                 });
             }
@@ -308,8 +308,8 @@ const globalUtils = {
         let guild = req.guild;
 
         if (!guild) {
-            return res.status(400).json({
-                code: 400,
+            return res.status(404).json({
+                code: 404,
                 message: "Unknown Guild"
             });
         }
@@ -326,8 +326,8 @@ const globalUtils = {
         let member = await database.getGuildMemberById(guild.id, sender.id);
 
         if (member == null) {
-            return res.status(400).json({
-                code: 400,
+            return res.status(404).json({
+                code: 404,
                 message: "Unknown Guild"
             });
         }

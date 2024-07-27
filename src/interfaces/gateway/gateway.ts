@@ -13,6 +13,7 @@ interface Gateway {
     dispatchEventToAll: (data: any) => boolean;
     dispatchEventTo: (token: string, data: any) => boolean;
     dispatchEventToAllPerms: (guild_id: string, channel_id: string | null, permission_check: string, data: any) => Promise<boolean>;
+    dispatchGuildMemberUpdateToAllTheirGuilds: (user_id: string) => Promise<boolean>;
     dispatchEventInGuild: (guild_id: string, data: any) => Promise<boolean>;
     dispatchEventInChannel: (channel_id: string, data: any) => Promise<boolean>;
     dispatchInDM: (sender_id: string, receiver_id: string, data: any) => Promise<boolean>;

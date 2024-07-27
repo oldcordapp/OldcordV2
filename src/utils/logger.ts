@@ -7,7 +7,7 @@ const logText = (text: string, type: string) => {
         return;
     }
 
-    console.log(`[OLDCORDV2] <${type.toUpperCase()}>: ${text}`);
+    //console.log(`[OLDCORDV2] <${type.toUpperCase()}>: ${text}`);
 };
 
 export {

@@ -12,13 +12,13 @@ const gateway: Gateway = {
     port: null,
     clients: [],
     dispatchEventToAll: (data: any) => {
-        console.log(`[DISPATCHER] -> ${JSON.stringify(data)}`);
+        //console.log(`[DISPATCHER] -> ${JSON.stringify(data)}`);
 
         for(var client of gateway.clients) {
             gateway.send(client.socket, data);
         }
 
-        console.log(`[DISPATCH EVENT TO ALL] -> ${JSON.stringify(data)}`)
+        //console.log(`[DISPATCH EVENT TO ALL] -> ${JSON.stringify(data)}`)
 
         return true;
     },
@@ -34,7 +34,7 @@ const gateway: Gateway = {
             return false;
         }
 
-        console.log(`[DISPATCH EVENT TO] -> ${JSON.stringify(data)}`)
+        //console.log(`[DISPATCH EVENT TO] -> ${JSON.stringify(data)}`)
 
         gateway.send(socket, data);
 
@@ -67,7 +67,7 @@ const gateway: Gateway = {
         gateway.send(socket1, data);
         gateway.send(socket2, data);
 
-        console.log(`[DISPATCH EVENT IN DMS] -> ${JSON.stringify(data)}`)
+        //console.log(`[DISPATCH EVENT IN DMS] -> ${JSON.stringify(data)}`)
 
         return true;
     },
@@ -133,6 +133,55 @@ const gateway: Gateway = {
         }
 
         return true;
+    },
+    dispatchGuildMemberUpdateToAllTheirGuilds: async (user_id: string) => {
+        const user = await database.getAccountByUserId(user_id);
+
+        if (user == null) {
+            return false;
+        }
+
+        const guilds = await database.getUsersGuilds(user_id);
+
+        if (guilds.length == 0) {
+            return false;
+        }
+
+        let successCount = 0;
+
+        for(var guild of guilds) {
+            let member = await database.getGuildMemberById(guild.id, user.id);
+
+            if (member == null) {
+                continue;
+            }
+
+            //GUILD_MEMBER_UPDATE is so buggy here, lets try USER_UPDATE instead
+            /*
+
+            let attempt = await gateway.dispatchEventInGuild(guild.id, {
+                op: 0,
+                t: "GUILD_MEMBER_UPDATE",
+                s: null,
+                d: {
+                    roles: member.roles,
+                    user: member.user,
+                    guild_id: guild.id
+                }
+            });
+            */
+
+            let attempt = await gateway.dispatchEventInGuild(guild.id, {
+                op: 0,
+                t: "USER_UPDATE",
+                s: null,
+                d: member.user
+            })
+
+            if (attempt) successCount++;
+        }
+
+        return successCount == guilds.length;
     },
     dispatchEventInGuild: async (guild_id: string, data: any) => {
         const guild = await database.getGuildById(guild_id);
@@ -206,7 +255,7 @@ const gateway: Gateway = {
             await gateway.send(socket, data);
         }
 
-        console.log(`[DISPATCH EVENT IN CHANNEL] -> ${JSON.stringify(data)}`)
+        //console.log(`[DISPATCH EVENT IN CHANNEL] -> ${JSON.stringify(data)}`)
 
         return true;
     },
@@ -348,6 +397,7 @@ const gateway: Gateway = {
                         const guilds = await database.getUsersGuilds(user.id);
 
                         let presences: any[] = [];
+                        let read_states: any[] = [];
 
                         for(var guild of guilds) {
                             let presencex = await database.getGuildPresences(guild.id)
@@ -365,6 +415,14 @@ const gateway: Gateway = {
                                         },
                                         status: pren.status
                                     })
+                                }
+                            }
+
+                            if (guild.channels) {
+                                for(var channel of guild.channels) {
+                                    let getLatestAcknowledgement = await database.getLatestAcknowledgement(user.id, channel.id);
+
+                                    if (getLatestAcknowledgement) read_states.push(getLatestAcknowledgement)
                                 }
                             }
                         }
@@ -410,7 +468,7 @@ const gateway: Gateway = {
                                 guilds: guilds,
                                 presences: presences,
                                 private_channels: dms,
-                                read_state: [],
+                                read_state: read_states,
                                 tutorial: tutorial,
                                 user: user,
                                 user_settings: {

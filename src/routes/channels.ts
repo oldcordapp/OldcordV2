@@ -22,7 +22,7 @@ router.param('channelid', async (req: any, res: any, next: any, channelid: any) 
         req.guild = await database.getGuildById(channel.guild_id);
     }
 
-    console.log(JSON.stringify(req.channel));
+    //console.log(JSON.stringify(req.channel));
     
     next();
 });
@@ -120,15 +120,15 @@ router.patch("/:channelid", globalUtils.channelMiddleware, globalUtils.channelPe
         const channel = req.channel;
 
         if (channel == null) {
-            return res.status(400).json({
-                code: 400,
+            return res.status(404).json({
+                code: 404,
                 message: "Unknown Channel"
             });
         }
 
         if (!req.body.name) {
             return res.status(400).json({
-                code: 400,
+                code: 404,
                 name: "This field is required.",
             });
         } 

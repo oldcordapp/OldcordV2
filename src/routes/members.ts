@@ -8,12 +8,12 @@ import Role from '../interfaces/guild/role';
 
 const router = express.Router({ mergeParams: true });
 
-router.param('userid', async (req: any, res: any, next: any, userid: any) => {
-    req.user = await database.getAccountByUserId(userid);
+router.param('memberid', async (req: any, res: any, next: any, memberid: any) => {
+    req.member = await database.getGuildMemberById(req.params.guildid, memberid);
     next();
 });
 
-router.delete("/:userid", globalUtils.guildPermissionsMiddleware("KICK_MEMBERS"), globalUtils.rateLimitMiddleware(200, 1000 * 60 * 60), async (req: any, res: any) => {
+router.delete("/:memberid", globalUtils.guildPermissionsMiddleware("KICK_MEMBERS"), globalUtils.rateLimitMiddleware(200, 1000 * 60 * 60), async (req: any, res: any) => {
     try {
         const sender = req.account;
 
@@ -24,7 +24,7 @@ router.delete("/:userid", globalUtils.guildPermissionsMiddleware("KICK_MEMBERS")
             });
         }
 
-        const member = req.user;
+        const member = req.member;
 
         if (member == null) {
             return res.status(404).json({
@@ -38,6 +38,8 @@ router.delete("/:userid", globalUtils.guildPermissionsMiddleware("KICK_MEMBERS")
         const attempt = await database.leaveGuild(member.id, req.params.guildid);
 
         if (!attempt) {
+            console.log("failed to kick the user" + req.params.userid);
+
             return res.status(500).json({
                 code: 500,
                 message: "Internal Server Error"
@@ -75,7 +77,7 @@ router.delete("/:userid", globalUtils.guildPermissionsMiddleware("KICK_MEMBERS")
 
         return res.status(204).send();
     } catch (error: any) {
-        logText(error.toString(), "error");
+        console.log(error.toString());
     
         return res.status(500).json({
           code: 500,
@@ -84,7 +86,7 @@ router.delete("/:userid", globalUtils.guildPermissionsMiddleware("KICK_MEMBERS")
     }
 });
 
-router.patch("/:userid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"), globalUtils.rateLimitMiddleware(200, 1000 * 60 * 60), async (req: any, res: any) => {
+router.patch("/:memberid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"), globalUtils.rateLimitMiddleware(200, 1000 * 60 * 60), async (req: any, res: any) => {
     try {
         const sender = req.account;
 
@@ -95,7 +97,7 @@ router.patch("/:userid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"),
             });
         }
 
-        const member = req.user;
+        const member = req.member;
 
         if (member == null) {
             return res.status(404).json({
@@ -147,12 +149,9 @@ router.patch("/:userid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"),
             t: "GUILD_MEMBER_UPDATE",
             s: null,
             d: {
-              id: member.id,
-              user: member.user,
-              guild_id: req.params.guildid,
-              roles: roles,
-              deaf: false,
-              mute: false
+                roles: member.roles,
+                user: member.user,
+                guild_id: req.params.guildid
             }
         });
 

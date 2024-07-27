@@ -25,7 +25,11 @@ import * as cookieParser from 'cookie-parser';
 import * as request from 'request';
 import waybackmachine from './utils/waybackmachine';
 import admin from './routes/admin/admin';
+import * as Jimp from 'jimp';
+import * as NodeCache from 'node-cache';
+import * as path from 'path';
 
+const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
 const app = express();
 
 app.set('trust proxy', 1);
@@ -38,6 +42,53 @@ app.use(cookieParser());
 
 app.use(cors());
 
+app.get('/attachments/:guildid/:channelid/:filename', async (req: any, res: any) => {
+    const path2 = path.join(__dirname, 'user_assets', 'attachments', req.params.guildid, req.params.channelid, req.params.filename);
+    
+    try {
+        let { width, height } = req.query;
+        const url = req.url;
+        
+
+        if (!url || !width || !height || url.includes(".gif")) {
+            return res.status(200).sendFile(path2);
+        }
+
+        if (parseInt(width as string) > 800) {
+            width = '800';
+        }
+
+        if (parseInt(height as string) > 800) {
+            height = '800';
+        }
+
+        const cacheKey = `${url}-${width}-${height}`;
+        const cachedImage = cache.get<Buffer>(cacheKey);
+        
+        const mime = req.params.filename.endsWith(".jpg") ? 'image/jpeg' : 'image/png';
+      
+        if (cachedImage) {
+            return res.status(200).type(mime).send(cachedImage);
+        }
+
+        const imageBuffer = fs.readFileSync(path2);
+
+        const image = await Jimp.read(imageBuffer);
+
+        image.resize(parseInt(width as string), parseInt(height as string));
+        const resizedImage = await image.getBufferAsync(mime);
+
+        cache.set(cacheKey, resizedImage);
+
+        return res.status(200).type(mime).send(resizedImage);
+    }
+    catch(err: any) {
+        console.log(err.toString());
+    
+        return res.status(200).sendFile(path2);
+    }
+});
+
 app.use('/assets', express.static(__dirname + '/assets'));
 app.use('/assets', express.static(__dirname + '/assets/2015'));
 app.use('/assets', express.static(__dirname + '/assets/2016'));
@@ -45,44 +96,6 @@ app.use('/assets', express.static(__dirname + '/assets/2017'));
 app.use('/icons/', express.static(__dirname + '/user_assets/icons'));
 app.use('/avatars/', express.static(__dirname + '/user_assets/avatars'));
 app.use('/attachments/', express.static(__dirname + '/user_assets/attachments'));
-
-app.use(async (req: any, res: any, next: any) => {
-    try {
-        if (!req.url.includes("/api/")) {
-            return next();
-        }
-
-        let token = req.headers['authorization'];
-        
-        if (!token) {
-            return res.status(401).json({
-                code: 401,
-                message: "Unauthorized"
-            });
-        }
-
-        let account = await database.getAccountByToken(token);
-    
-        if (!account) {
-            return res.status(401).json({
-                code: 401,
-                message: "Unauthorized"
-            });
-        }
-    
-        req.account = account;
-
-        next();
-    }
-    catch(err: any) {
-        console.log(err.toString());
-
-        return res.status(500).json({
-            code: 500,
-            message: "Internal Server Error"
-        });
-    }
-});
 
 app.use(globalUtils.rateLimitMiddleware(25, 10 * 1000));
 app.use(globalUtils.rateLimitMiddleware(100, 1 * 60 * 1000));
@@ -125,7 +138,7 @@ app.get("/assets/:asset", async (req: any, res: any) => {
     let year = release.includes("2015") ? "2015" : release.includes("2016") ? "2016" : "2017";
 
     if (!fs.existsSync(`${__dirname}/assets/${req.params.asset}`) && !fs.existsSync(`${__dirname}/assets/${year}/${req.params.asset}`)) {
-        console.log(`https://discordapp.com/assets/${req.params.asset}`);
+        //console.log(`https://discordapp.com/assets/${req.params.asset}`);
 
         let timestamps = await waybackmachine.getTimestamps(`https://discordapp.com/assets/${req.params.asset}`);
         let isOldBucket: boolean = false;
@@ -179,7 +192,7 @@ app.get("/assets/:asset", async (req: any, res: any) => {
                 fs.writeFileSync(`./assets/${year}/${req.params.asset}`, body);
             }
 
-            console.log(`[LOG] Saved ${req.params.asset} from ${snapshot_url} successfully.`);
+            //console.log(`[LOG] Saved ${req.params.asset} from ${snapshot_url} successfully.`);
 
             res.writeHead(resp.statusCode, { "Content-Type": resp.headers["content-type"] })
             res.status(resp.statusCode).end(body);
@@ -187,9 +200,47 @@ app.get("/assets/:asset", async (req: any, res: any) => {
     }
 });
 
-
 //app.use("/api/v6", v6);
 app.use("/api/auth", auth);
+
+app.use(async (req: any, res: any, next: any) => {
+    try {
+        if (!req.url.includes("/api/")) {
+            return next();
+        }
+
+        let token = req.headers['authorization'];
+        
+        if (!token) {
+            return res.status(401).json({
+                code: 401,
+                message: "Unauthorized"
+            });
+        }
+
+        let account = await database.getAccountByToken(token);
+    
+        if (!account) {
+            return res.status(401).json({
+                code: 401,
+                message: "Unauthorized"
+            });
+        }
+    
+        req.account = account;
+
+        next();
+    }
+    catch(err: any) {
+        //console.log(err.toString());
+
+        return res.status(500).json({
+            code: 500,
+            message: "Internal Server Error"
+        });
+    }
+});
+
 app.use("/api/admin", admin);
 app.use("/api/users", users);
 app.use("/api/voice", voice);
@@ -447,7 +498,7 @@ if (config.use_same_port) {
 
         gateway.ready(server);
 
-        webrtc.regularReady(1338);
+        //webrtc.regularReady(1338);
 
         server.listen(config.port, () => {
             database.setupDatabase();

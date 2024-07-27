@@ -109,19 +109,21 @@ router.patch("/", globalUtils.rateLimitMiddleware(5, 1000 * 60 * 60), async (req
       if (attemptToUpdateAvi) {
         let account2 = await database.getAccountByEmail(account.email);
 
-        if (account2 != null) {
-          delete account.password;
-          delete account.settings;
-          delete account.created_at;
+        if (account2 != null && account2.token) {
+          delete account2.password;
+          delete account2.settings;
+          delete account2.created_at;
 
-          await gateway.dispatchEventTo(account.token, {
-            t: "USER_UPDATE",
+          await gateway.dispatchEventTo(account2.token, {
             op: 0,
+            t: "USER_UPDATE",
             s: null,
-            d: account
+            d: account2
           });
 
-          return res.status(200).json(account);
+          await gateway.dispatchGuildMemberUpdateToAllTheirGuilds(account2.id);
+
+          return res.status(200).json(account2);
         }
       } else return res.status(500).json({
         code: 500,
@@ -185,19 +187,21 @@ router.patch("/", globalUtils.rateLimitMiddleware(5, 1000 * 60 * 60), async (req
         if (update) {
           let account2 = await database.getAccountByEmail(update_object.email);
   
-          if (account2 != null) {
-            delete account.settings;
-            delete account.password;
-            delete account.created_at;
+          if (account2 != null && account2.token) {
+            delete account2.settings;
+            delete account2.password;
+            delete account2.created_at;
   
-            await gateway.dispatchEventTo(account.token, {
-              t: "USER_UPDATE",
+            await gateway.dispatchEventTo(account2.token, {
               op: 0,
+              t: "USER_UPDATE",
               s: null,
-              d: account
+              d: account2
            })
+
+            await gateway.dispatchGuildMemberUpdateToAllTheirGuilds(account2.id);
             
-            return res.status(200).json(account);
+            return res.status(200).json(account2);
           }
         }
       }
@@ -209,10 +213,11 @@ router.patch("/", globalUtils.rateLimitMiddleware(5, 1000 * 60 * 60), async (req
       delete account.created_at;
     }
 
-
     return res.status(200).json(account);
   } catch (error: any) {
     logText(error.toString(), "error");
+
+    console.log(error.toString());
 
     return res.status(500).json({
       code: 500,
@@ -268,8 +273,8 @@ router.patch("/settings", async (req: any, res: any) => {
       }
 
       gateway.dispatchEventTo(account.token, {
-        t: "USER_SETTINGS_UPDATE",
         op: 0,
+        t: "USER_SETTINGS_UPDATE",
         s: null,
         d: settings
       });

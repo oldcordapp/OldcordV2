@@ -27,8 +27,8 @@ router.patch("/:roleid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"),
         let roles = await database.getGuildRoles(req.params.guildid);
 
         if (roles.length == 0) {
-            return res.status(400).json({
-                code: 400,
+            return res.status(404).json({
+                code: 404,
                 message: "Unknown Role"
             });
         }
@@ -36,8 +36,8 @@ router.patch("/:roleid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES"),
         let role = req.role;
 
         if (role == null) {
-            return res.status(400).json({
-                code: 400,
+            return res.status(404).json({
+                code: 404,
                 message: "Unknown Role"
             });
         }
@@ -95,8 +95,8 @@ router.delete("/:roleid", globalUtils.guildPermissionsMiddleware("MANAGE_ROLES")
         let role = req.role;
 
         if (role == null) {
-            return res.status(400).json({
-                code: 400,
+            return res.status(404).json({
+                code: 404,
                 message: "Unknown Role"
             });
         }

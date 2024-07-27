@@ -98,15 +98,6 @@ router.delete("/:guildid", globalUtils.guildMiddleware, globalUtils.rateLimitMid
         }
 
         if (guild.owner_id == user.id) {
-            const del = await database.deleteGuild(guild.id);
-
-            if (!del) {
-                return res.status(500).json({
-                    code: 500,
-                    message: "Internal Server Error"
-                });
-            }
-
             await gateway.dispatchEventInGuild(guild.id, {
                 op: 0,
                 t: "GUILD_DELETE",
@@ -115,6 +106,15 @@ router.delete("/:guildid", globalUtils.guildMiddleware, globalUtils.rateLimitMid
                     id: req.params.guildid
                 }
             });
+            
+            const del = await database.deleteGuild(guild.id);
+
+            if (!del) {
+                return res.status(500).json({
+                    code: 500,
+                    message: "Internal Server Error"
+                });
+            }
 
             return res.status(204).send();
         } else {
@@ -192,6 +192,15 @@ router.patch("/:guildid", globalUtils.guildMiddleware, globalUtils.guildPermissi
             });
         }
 
+        let what = req.guild;
+
+        if (what == null) {
+            return res.status(500).json({
+                code: 500,
+                message: "Internal Server Error"
+            }); 
+        }
+
         const update = await database.updateGuild(req.params.guildid, req.body.afk_channel_id, req.body.afk_timeout, req.body.icon, req.body.name, req.body.region);
 
         if (!update) {
@@ -201,7 +210,7 @@ router.patch("/:guildid", globalUtils.guildMiddleware, globalUtils.guildPermissi
             });
         }
 
-        const what = req.guild;
+        what = await database.getGuildById(req.params.guildid);
 
         if (what == null) {
             return res.status(500).json({

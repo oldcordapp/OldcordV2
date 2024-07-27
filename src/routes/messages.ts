@@ -22,11 +22,7 @@ router.param('messageid', async (req: any, res: any, next: any, messageid: any) 
 
 router.get("/", globalUtils.channelPermissionsMiddleware("READ_MESSAGE_HISTORY"), async (req: any, res: any) => {
     try {
-        console.log("called within get messages");
-
         const creator = req.account;
-
-        console.log(JSON.stringify(creator));
 
         if (creator == null) {
             return res.status(500).json({
@@ -34,9 +30,6 @@ router.get("/", globalUtils.channelPermissionsMiddleware("READ_MESSAGE_HISTORY")
                 message: "Internal Server Error"
             });
         }
-
-        console.log(req);
-        console.log(req.channel);
 
         const channel = req.channel;
 
@@ -47,58 +40,23 @@ router.get("/", globalUtils.channelPermissionsMiddleware("READ_MESSAGE_HISTORY")
             });
         }
 
-        const messages: Message[] = await database.getChannelMessages(channel.id);
-
-        if (messages == null || messages.length == 0) {
-            return res.status(200).json([]);
-        }
-
-        let limit = req.query.limit ? parseInt(req.query.limit as string) : messages.length;
-        const ret: Message[] = [];
+        let limit = parseInt(req.query.limit) || 200;
 
         if (limit > 200) {
             limit = 200;
         }
 
+        let messages: Message[] = [];
+
         if (req.query.before) {
-            const msg: Message | undefined = messages.find(x => x.id == req.query.before);
-            if (msg != null) {
-                const index: number = messages.indexOf(msg);
-                let counter: number = 0;
+            messages = await database.getChannelMessages(channel.id, limit, req.query.before);
+        } else messages = await database.getChannelMessages(channel.id, limit);
 
-                for (let i = index + 1; i < messages.length; i++) {
-                    if (counter >= limit) {
-                        break;
-                    }
-
-                    const message = messages[i];
-
-                    if (message == null) {
-                        continue;
-                    }
-
-                    ret.push(message);
-                    counter++;
-                }
-            }
-        } else {
-            let count: number = 0;
-
-            for (const msg of messages) {
-                if (count >= limit) {
-                    break;
-                }
-
-                if (msg == null) {
-                    continue;
-                }
-
-                ret.push(msg);
-                count++;
-            }
+        if (messages == null || messages.length == 0) {
+            return res.status(200).json([]);
         }
 
-        return res.status(200).json(ret);
+        return res.status(200).json(messages);
     } catch (error: any) {
         logText(error.toString(), "error");
 
@@ -109,7 +67,7 @@ router.get("/", globalUtils.channelPermissionsMiddleware("READ_MESSAGE_HISTORY")
     }
 });
 
-router.post("/", upload.single('file'), globalUtils.channelPermissionsMiddleware("SEND_MESSAGES"), globalUtils.rateLimitMiddleware(200, 1000 * 60 * 5), async (req: any, res: any) => {
+router.post("/", upload.single('file'), globalUtils.channelPermissionsMiddleware("SEND_MESSAGES"), globalUtils.rateLimitMiddleware(200, 1000 * 60 * 60), async (req: any, res: any) => {
     try {
         const creator = req.account;
 
@@ -131,29 +89,29 @@ router.post("/", upload.single('file'), globalUtils.channelPermissionsMiddleware
 
         let finalContent: String = req.body.content;
 
-        if (req.body.mentions) {
+        if (req.body.mentions && req.body.mentions.length > 0) {
             const mentions: string[] = req.body.mentions;
             
-            if (mentions != null && mentions.length > 0) {
-                for(let mention of mentions) {
-                    const user = await database.getAccountByUserId(mention);
+            for(let mention of mentions) {
+                const user = await database.getAccountByUserId(mention);
 
-                    if (user != null && user.token) {
-                        finalContent = finalContent.replace(`@${user.username}`, `<@${user.id}>`);
-                    }
+                if (user != null) {
+                    finalContent = finalContent.replace(`@${user.username}`, `<@${user.id}>`);
                 }
             }
+
+            req.body.content = finalContent;
         }
 
-        if (finalContent.includes("@everyone")) {
+        if (finalContent && finalContent.includes("@everyone")) {
             let pCheck = await globalUtils.hasChannelPermissionTo(req.channel, req.guild, creator.id, "MENTION_EVERYONE");
 
             if (!pCheck) {
                 finalContent = finalContent.replace(/@everyone/g, "");
             } 
-        }
 
-        req.body.content = finalContent;
+            req.body.content = finalContent;
+        }
 
         if (channel.recipient != null) {
             const recipient = await database.getAccountByUserId(channel.recipient.id);
@@ -315,6 +273,8 @@ router.post("/", upload.single('file'), globalUtils.channelPermissionsMiddleware
             }
         }
       } catch (error: any) {
+        console.log(error.toString());
+
         logText(error.toString(), "error");
     
         return res.status(500).json({
@@ -467,6 +427,32 @@ router.patch("/:messageid", async (req: any, res: any) => {
                 });
             }
 
+            let finalContent: String = req.body.content;
+
+            if (req.body.mentions && req.body.mentions.length > 0) {
+                const mentions: string[] = req.body.mentions;
+                
+                for(let mention of mentions) {
+                    const user = await database.getAccountByUserId(mention);
+
+                    if (user != null) {
+                        finalContent = finalContent.replace(`@${user.username}`, `<@${user.id}>`);
+                    }
+                }
+
+                req.body.content = finalContent;
+            }
+
+            if (finalContent && finalContent.includes("@everyone")) {
+                let pCheck = await globalUtils.hasChannelPermissionTo(req.channel, req.guild, message.author.id, "MENTION_EVERYONE");
+
+                if (!pCheck) {
+                    finalContent = finalContent.replace(/@everyone/g, "");
+                } 
+
+                req.body.content = finalContent;
+            }
+
             const update = await database.updateMessage(message.id, req.body.content);
 
             if (!update) {
@@ -492,7 +478,7 @@ router.patch("/:messageid", async (req: any, res: any) => {
                 d: message
             })
 
-            return res.status(200).send();
+            return res.status(204).send();
         } else {
             if (!channel.guild_id) {
                 return res.status(404).json({
@@ -515,6 +501,32 @@ router.patch("/:messageid", async (req: any, res: any) => {
                     code: 403,
                     message: "Missing Permissions"
                 });
+            }
+
+            let finalContent: String = req.body.content;
+
+            if (req.body.mentions && req.body.mentions.length > 0) {
+                const mentions: string[] = req.body.mentions;
+                
+                for(let mention of mentions) {
+                    const user = await database.getAccountByUserId(mention);
+
+                    if (user != null) {
+                        finalContent = finalContent.replace(`@${user.username}`, `<@${user.id}>`);
+                    }
+                }
+
+                req.body.content = finalContent;
+            }
+
+            if (finalContent && finalContent.includes("@everyone")) {
+                let pCheck = await globalUtils.hasChannelPermissionTo(req.channel, req.guild, message.author.id, "MENTION_EVERYONE");
+
+                if (!pCheck) {
+                    finalContent = finalContent.replace(/@everyone/g, "");
+                } 
+
+                req.body.content = finalContent;
             }
 
             const update = await database.updateMessage(message.id, req.body.content);
@@ -542,8 +554,67 @@ router.patch("/:messageid", async (req: any, res: any) => {
                 d: message
             })
 
-            return res.status(200).send();
+            return res.status(204).send();
         }
+    } catch (error: any) {
+        logText(error.toString(), "error");
+    
+        return res.status(500).json({
+          code: 500,
+          message: "Internal Server Error"
+        });
+    }
+});
+
+router.post("/:messageid/ack", async (req: any, res: any) => {
+    try {
+        const guy = req.account;
+
+        if (guy == null || !guy.token) {
+            return res.status(401).json({
+                code: 401,
+                message: "Unauthorized"
+            });
+        }
+
+        const message = req.message;
+
+        if (message == null) {
+            return res.status(404).json({
+                code: 404,
+                message: "Unknown Message"
+            });
+        }
+
+        const channel = req.channel;
+
+        if (channel == null) {
+            return res.status(404).json({
+                code: 404,
+                message: "Unknown Channel"
+            });
+        }
+
+        let tryAck = await database.acknowledgeMessage(guy.id, channel.id, message.id, 0);
+
+        if (!tryAck) {
+            return res.status(500).json({
+                code: 500,
+                message: "Internal Server Error"
+            });
+        }
+
+        await gateway.dispatchEventTo(guy.token, {
+            t: "MESSAGE_ACK",
+            op: 0,
+            s: null,
+            d: {
+                channel_id: channel.id,
+                message_id: message.id
+            }
+        });
+        
+        return res.status(204).send();
     } catch (error: any) {
         logText(error.toString(), "error");
     

@@ -31,7 +31,7 @@ interface Database {
     getGuildById: (id: string) => Promise<Guild | null>;
     getMessageById: (id: string) => Promise<Message | null>;
     getChannelById: (id: string) => Promise<Channel | null>;
-    getChannelMessages: (id: string) => Promise<Message[] | []>;
+    getChannelMessages: (id: string, limit?: number, before_id?: string) => Promise<Message[] | []>;
     getRoleById: (id: string) => Promise<Role | null>;
     getGuildWidget: (guild_id: string) => Promise<Widget | null>; 
     getGuildMembers: (id: string) => Promise<Member[] | []>;
@@ -51,6 +51,8 @@ interface Database {
     isDMClosed: (user_id: string, channel_id: string) => Promise<boolean>;
     getClosedDMChannels: (user_id: string) => Promise<Channel[] | []>;
     getUsersMessagesInGuild: (guild_id: string, author_id: string) => Promise<Message[] | []>;
+    getLatestAcknowledgement: (user_id: string, channel_id: string) => Promise<any | null>;
+    acknowledgeMessage: (user_id: string, channel_id: string, message_id: string, mention_count: number) => Promise<boolean>;
     updateTutorial: (user_id: string, indicators_suppressed: boolean, indicators_confirmed: string[]) => Promise<boolean>;
     leaveGuild: (user_id: string, guild_id: string) => Promise<boolean>;
     joinGuild: (user_id: string, guild_id: string) => Promise<boolean>;

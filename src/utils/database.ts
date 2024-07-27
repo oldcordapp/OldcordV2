@@ -22,9 +22,10 @@ import Invite from '../interfaces/guild/invite';
 import config from './config';
 import gateway from '../gateway';
 
-let db_config: any = JSON.stringify(fs.readFileSync("./db_config.json"));
+let db_config: any = JSON.parse(fs.readFileSync("./db_config.json", "utf8"));
 
 const pool = new Pool(db_config);
+let cache: { [key: string]: any } = {};
 
 const database: Database = {
     client: null,
@@ -41,7 +42,41 @@ const database: Database = {
                 values: values
             };
 
-            console.log("executing: " + queryString);
+            const cacheKey = JSON.stringify(query);
+
+            if (queryString.includes("SELECT * ")) {
+                if (cache[cacheKey]) {
+                    return cache[cacheKey];
+                }
+
+                const result = await database.client.query(query);
+
+                const rows = result.rows;
+
+                if (rows.length === 0) {
+                    return null;
+                }
+
+                cache[cacheKey] = rows;
+        
+                return rows;
+            } else if (queryString.includes("DELETE FROM") || queryString.includes("UPDATE") || queryString.includes("INSERT INTO")) {
+                let tableName: string = "";
+
+                if (queryString.startsWith("DELETE FROM")) {
+                    tableName = queryString.split(' ')[2];
+                } else if (queryString.startsWith("UPDATE")) {
+                    tableName = queryString.split('SET')[0].split('UPDATE ')[1].split(' ')[0];
+                } else if (queryString.startsWith("INSERT INTO")) {
+                    tableName = queryString.split('INSERT INTO ')[1].split(' ')[0];
+                }
+
+                for (const key in cache) {
+                    if (key.includes(tableName)) {
+                        delete cache[key];
+                    }
+                }
+            }
 
             const result = await database.client.query(query);
 
@@ -160,6 +195,14 @@ const database: Database = {
                 tts INTEGER DEFAULT 0
             );`, []);
 
+            await database.runQuery(`CREATE TABLE IF NOT EXISTS acknowledgements (
+                user_id TEXT,
+                channel_id TEXT,
+                message_id TEXT,
+                timestamp TEXT,
+                mention_count INTEGER DEFAULT 0
+            );`, []);
+
             await database.runQuery(`CREATE TABLE IF NOT EXISTS attachments (
                 attachment_id TEXT,
                 message_id TEXT,
@@ -229,6 +272,43 @@ const database: Database = {
             logText(error.toString(), "error");
 
             return 0;
+        }
+    },
+    getLatestAcknowledgement: async (user_id: string, channel_id: string) => {
+        try {
+            const rows = await database.runQuery(`
+                SELECT * FROM acknowledgements WHERE user_id = $1 AND channel_id = $2 ORDER BY timestamp DESC LIMIT 1
+            `, [user_id, channel_id]);
+
+            if (rows != null && rows.length > 0) {
+                return null;
+            }
+
+            return {
+                id: rows[0].channel_id,
+                mention_count: rows[0].mention_count,
+                last_message_id: rows[0].message_id
+            };
+        }
+        catch (error: any) {
+            logText(error.toString(), "error");
+
+            return null;
+        }
+    },
+    acknowledgeMessage: async (user_id: string, channel_id: string, message_id: string, mention_count: number) => {
+        try {
+            const date = new Date().toISOString();
+
+            await database.runQuery(`
+                INSERT INTO acknowledgements (user_id, channel_id, message_id, mention_count, timestamp) VALUES ($1, $2, $3, $4, $5)
+            `, [user_id, channel_id, message_id, mention_count, date]);
+
+            return true;
+        } catch (error: any) {
+            logText(error.toString(), "error");
+
+            return false;
         }
     },
     getMessageCount: async () => {
@@ -934,11 +1014,23 @@ const database: Database = {
             return null;
         }
     },
-    getChannelMessages: async (id: string) => {
+    getChannelMessages: async (id: string, limit?: number, before_id?: string) => {
         try {
-            const rows = await database.runQuery(`
-                SELECT * FROM messages WHERE channel_id = $1 ORDER BY timestamp DESC
-            `, [id]);
+            let query = `SELECT * FROM messages WHERE channel_id = $1 `;
+            const params: any[] = [id];
+
+            if (before_id) {
+                query += 'AND message_id < $2 ';
+                params.push(before_id);
+            }
+
+            if (before_id) {
+                query += 'ORDER BY timestamp DESC LIMIT $3';
+            } else query += 'ORDER BY timestamp DESC LIMIT $2';
+
+            params.push(limit);
+
+            const rows = await database.runQuery(query, params);
 
             if (rows == null || rows.length == 0) {
                 return [];
@@ -946,8 +1038,7 @@ const database: Database = {
 
             const ret: Message[] = [];
 
-            for(var row of rows) {
-
+            for (const row of rows) {
                 const message = await database.getMessageById(row.message_id);
 
                 if (message != null) {
@@ -957,6 +1048,8 @@ const database: Database = {
 
             return ret;
         } catch (error: any) {
+            console.log(error.toString());
+
             logText(error.toString(), "error");
 
             return [];
@@ -2190,8 +2283,6 @@ const database: Database = {
                 } else {
                     await database.runQuery(`UPDATE users SET username = $1, email = $2 WHERE id = $3`, [new_username, new_email2, account.id]);
                 }
-
-                return true;
             } else if (new_password != null) {
                 const checkPassword = await database.doesThisMatchPassword(new_password, account.password);
 
@@ -2204,11 +2295,9 @@ const database: Database = {
                 let token = globalUtils.generateToken(account.id, newPwHash);
 
                 await database.runQuery(`UPDATE users SET username = $1, email = $2, password = $3, token = $4 WHERE id = $5`, [new_username, new_email2, newPwHash, token, account.id]);
-                
-                return true;
             }
             
-            return false;
+            return true;
         } catch (error: any) {
             logText(error.toString(), "error");
 
