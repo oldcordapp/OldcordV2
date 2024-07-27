@@ -10,7 +10,7 @@ Ziad from hummus for 10% of the code (Permissions handling & token stuff) - love
 oh and discord.js devs for snowflake stuff <br />
 
 # Setup
-First you need a postgres server & db running on your server/machine, then you'd need to create a json file in the src directory with your db login information 
+First you need a postgres server & db running on your server/machine, then you'd need to create a db_config.json file in the src directory with your db login information 
 
 Like so:
 
