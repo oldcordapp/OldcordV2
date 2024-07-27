@@ -10,17 +10,17 @@ Ziad from hummus for 10% of the code (Permissions handling & token stuff) - love
 oh and discord.js devs for snowflake stuff <br />
 
 # Setup
-First you need a postgres server & db running on your server/machine, then you'd need to replace the user, password and database name + host/port if required in /utils/database.ts
+First you need a postgres server & db running on your server/machine, then you'd need to create a json file in the src directory with your db login information 
 
 Like so:
 
 ```js
-const configuration = {
-    host: 'localhost',
-    port: 5433,
-    database: 'oldcord_2015',
-    user: 'postgres',
-    password: 'passwordhere'
+{
+    "host": "localhost",
+    "port": 5433,
+    "database": "database",
+    "user": "user",
+    "password": "password"
 }
 ```
 
