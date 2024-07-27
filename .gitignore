@@ -2,3 +2,4 @@ db_config.json
 config.ts
 *.js
 src/utils/config.ts
+src/utils/config.ts
