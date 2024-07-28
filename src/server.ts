@@ -443,9 +443,11 @@ app.get("/invite/:code", async (req: any, res: any) => {
     return res.send(fs.readFileSync(`./assets/${year}/${version}/invite.html`, 'utf8'));
 });
 
-//app.get("/selector", (req: any, res: any) => {
-    //res.send(fs.readFileSync(`./assets/selector/selector.html`, 'utf8'));
-//}); no longer needed
+if (config.serveSelector) {
+    app.get("/selector", (req: any, res: any) => {
+        res.send(fs.readFileSync(`./assets/selector/selector.html`, 'utf8'));
+    });
+}
 
 app.get("/launch", (req: any, res: any) => {
     if (!req.query.release_date) {
