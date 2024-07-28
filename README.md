@@ -40,6 +40,7 @@ const config = {
     port: 1337,
     cache404s: false,
     gateway_has_no_port: true,
+    serveSelector: false, //set this to true if you dont use an nginx block for the selector assets serving, staging and prod does so this is basically unnecessary for us
     instance_flags: [
         //"NO_REGISTRATION",
         //"NO_GUILD_CREATION",
