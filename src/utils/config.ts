@@ -7,6 +7,7 @@ const config = {
     use_same_port: true,
     port: 1337,
     cache404s: false,
+    serveSelector: false,
     gateway_has_no_port: false,
     instance_name: "2015 Staging",
     instance_description: "An oldcord instance",
