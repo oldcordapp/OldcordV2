@@ -7,7 +7,7 @@ const config = {
     use_same_port: true,
     port: 1337,
     cache404s: false,
-    serveSelector: false, //use this if you haven't set up an nginx block
+    serveSelector: true, //use this if you haven't set up an nginx block
     gateway_has_no_port: false,
     instance_name: "2015 Staging",
     instance_description: "An oldcord instance",

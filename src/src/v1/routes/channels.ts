@@ -16,14 +16,54 @@ const router = express.Router({ mergeParams: true });
 router.param('channelid', async (req: any, res: any, next: any, channelid: any) => {
     const channel = await database.getChannelById(channelid);
 
-    req.channel = channel;
+    if (channel == null) {
+        let dmChannel = await database.getDMChannelById(channelid);
 
-    if (channel && channel.guild_id) {
-        req.guild = await database.getGuildById(channel.guild_id);
+        if (dmChannel == null) {
+            req.channel = null;
+        } else {
+            let user = await database.getAccountByToken(req.headers['authorization']);
+
+            if (user != null) {
+                if (dmChannel.author_of_channel_id == user.id) {
+                    req.channel = {
+                        id: dmChannel.id,
+                        name: "", //dm channels have no name lol
+                        topic: "",
+                        position: 0,
+                        recipient: {
+                            id: dmChannel.receiver_of_channel_id
+                        },
+                        type: "text",
+                        guild_id: null,
+                        is_private: true,
+                        permission_overwrites: [] 
+                    }
+                } else {
+                    req.channel = {
+                        id: dmChannel.id,
+                        name: "", //dm channels have no name lol
+                        topic: "",
+                        position: 0,
+                        recipient: {
+                            id: dmChannel.author_of_channel_id
+                        },
+                        type: "text",
+                        guild_id: null,
+                        is_private: true,
+                        permission_overwrites: [] 
+                    }
+                }
+            } else req.channel = null;
+        }
+    } else {
+        req.channel = channel;
+
+        if (channel && channel.guild_id) {
+            req.guild = await database.getGuildById(channel.guild_id);
+        }
     }
 
-    //console.log(JSON.stringify(req.channel));
-    
     next();
 });
 
@@ -533,8 +573,6 @@ router.delete("/:channelid", globalUtils.channelMiddleware, globalUtils.guildPer
             });
         }
 
-        let channel_id = req.params.channelid;
-
         let channel = req.channel;
 
         if (channel == null) {
@@ -544,11 +582,11 @@ router.delete("/:channelid", globalUtils.channelMiddleware, globalUtils.guildPer
             });
         }
 
-        if (!channel?.guild_id) {
-            let alreadyClosed = await database.isDMClosed(sender.id, channel.id);
+        if (!channel.guild_id) {
+            let alreadyClosed = await database.isDMClosed(channel.id);
 
             if (!alreadyClosed) {
-                let tryClose = await database.closeDMChannel(sender.id, channel.id);
+                let tryClose = await database.closeDMChannel(channel.id);
 
                 if (!tryClose) {
                     return res.status(500).json({
@@ -564,9 +602,23 @@ router.delete("/:channelid", globalUtils.channelMiddleware, globalUtils.guildPer
                 s: null,
                 d: {
                     id: channel.id,
-                    guild_id: channel.guild_id
+                    guild_id: null
                 }
             });
+            
+            let recipient = await database.getAccountByUserId(channel.recipient.id);
+
+            if (recipient != null && recipient.token) {
+                await gateway.dispatchEventTo(recipient.token, {
+                    op: 0,
+                    t: "CHANNEL_DELETE",
+                    s: null,
+                    d: {
+                        id: channel.id,
+                        guild_id: null
+                    }
+                });
+            }
 
             return res.status(204).send();
         } else {

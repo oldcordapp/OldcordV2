@@ -152,6 +152,7 @@ router.delete("/:guildid", globalUtils.guildMiddleware, globalUtils.rateLimitMid
                 t: "GUILD_MEMBER_REMOVE",
                 s: null,
                 d: {
+                    type: "leave",
                     roles: [],
                     user: {
                         username: user.username,

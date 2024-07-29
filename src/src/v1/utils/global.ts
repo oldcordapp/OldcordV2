@@ -12,6 +12,7 @@ import { Request, Response } from 'express';
 import gateway from '../gateway';
 import Presence from '../interfaces/presence';
 import rateLimit from 'express-rate-limit';
+import Guild from '../interfaces/guild';
 
 const globalUtils = {
     generateString(length: number) {
@@ -29,26 +30,42 @@ const globalUtils = {
         let code = "";
 
         var words = [
-            "horse",
-            "lock",
-            "frame",
-            "push",
-            "words",
-            "desk",
-            "secret",
-            "connect",
-            "reality",
-            "wizard",
-            "witch",
-            "sane",
-            "brain",
-            "scope",
-            "filter"
+            "karthus",
+            "terrorblade",
+            "remora",
+            "archon",
+            "phantom",
+            "charmander",
+            "azmodan",
+            "landslide",
+            "anivia",
+            "biggs",
+            "rosalina",
+            "overlord",
+            "sephiroth",
+            "cloud",
+            "tifa",
+            "illidan",
+            "jaina",
+            "arthas",
+            "sylvanas",
+            "thrall",
+            "invoker",
+            "pudge",
+            "crystal",
+            "anti",
+            "jinx",
+            "lux",
+            "zed",
+            "yasuo",
+            "ahri"
         ];
 
         for(var i = 0; i < 3; i++) {
-            code += words[Math.floor(Math.random() * words.length)]
+            code += words[Math.floor(Math.random() * words.length)] + `-`
         };
+
+        code = code.substring(code.lastIndexOf('-'), -1);
 
         return code;
     },  
@@ -269,8 +286,6 @@ const globalUtils = {
             const channel = req.channel;
 
             if (channel == null) {
-                //console.log("channel permissions middleware issue");
-
                 return res.status(404).json({
                     code: 404,
                     message: "Unknown Channel"
@@ -283,6 +298,41 @@ const globalUtils = {
                         code: 403,
                         message: "Missing Permissions"
                     });
+                }
+
+                if (permission == "SEND_MESSAGES") {
+                    const theirguilds: Guild[] = await database.getUsersGuilds(channel.recipient.id);
+                    const myguilds: Guild[] = await database.getUsersGuilds(sender.id);
+
+                    let share: boolean = false;
+
+                    for (var their of theirguilds) {
+                        if (their.members != null && their.members.length > 0) {
+                            const theirmembers: Member[] = their.members;
+
+                            if (theirmembers.filter(x => x.id == sender.id).length > 0) {
+                                share = true;
+                            }
+                        }
+                    }
+
+                    for (var mine of myguilds) {
+                        if (mine.members != null && mine.members.length > 0) {
+                            const mymembers: Member[] = mine.members;
+
+                            if (mymembers.filter(x => x.id == channel.recipient.id).length > 0) {
+                                share = true;
+                            }
+                        }
+                    }
+
+                    //horrendous code
+                    if (!share) {
+                        return res.status(403).json({
+                            code: 403,
+                            message: "Missing Permissions"
+                        });
+                    }
                 }
 
                 return next();

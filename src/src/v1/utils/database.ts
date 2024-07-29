@@ -9,6 +9,7 @@ import Ban from '../interfaces/guild/ban';
 import * as fs from 'fs'
 import * as md5 from 'md5';
 import Channel from '../interfaces/guild/channel';
+import DMChannel from '../interfaces/dmchannel';
 import Member from '../interfaces/guild/member';
 import Role from '../interfaces/guild/role';
 import Presence from '../interfaces/presence';
@@ -116,17 +117,18 @@ const database: Database = {
                 guild_id TEXT,
                 topic TEXT DEFAULT NULL,
                 last_message_id TEXT DEFAULT '0',
-                recipient_id TEXT DEFAULT NULL,
-                is_private INTEGER DEFAULT 0,
                 permission_overwrites TEXT,
                 name TEXT,
                 position INTEGER DEFAULT 0
             );`, []);
 
             await database.runQuery(`
-            CREATE TABLE IF NOT EXISTS closed_channels (
-                user_id TEXT,
-                channel_id TEXT
+            CREATE TABLE IF NOT EXISTS dm_channels (
+                id TEXT,
+                last_message_id TEXT DEFAULT '0',
+                author_of_channel_id TEXT,
+                receiver_of_channel_id TEXT,
+                is_closed INTEGER DEFAULT 0
             );`, []);
 
             await database.runQuery(`
@@ -560,10 +562,6 @@ const database: Database = {
                         type: row.type,
                         topic: row.topic == 'NULL' ? null : row.topic,
                         last_message_id: row.last_message_id,
-                        recipient: row.recipient_id == 'NULL' ? null : {
-                            id: row.recipient_id
-                        },
-                        is_private: row.is_private == 1 ? true : false,
                         permission_overwrites: perms,
                         position: row.position
                     })
@@ -700,7 +698,7 @@ const database: Database = {
         try {
             const channel_id = Snowflake.generate();
 
-            await database.runQuery(`INSERT INTO channels (id, type, guild_id, topic, last_message_id, recipient_id, is_private, permission_overwrites, name, position) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, [channel_id, type, guild_id, 'NULL', '0', 'NULL', 0, 'NULL', name, 0])
+            await database.runQuery(`INSERT INTO channels (id, type, guild_id, topic, last_message_id, permission_overwrites, name, position) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, [channel_id, type, guild_id, 'NULL', '0', 'NULL', name, 0])
 
             const channel = await database.getChannelById(channel_id);
 
@@ -727,7 +725,7 @@ const database: Database = {
                 }
             }
 
-            await database.runQuery(`UPDATE channels SET type = $1, id = $2, guild_id = $3, last_message_id = $4, name = $5, topic = $6, recipient_id = $7, permission_overwrites = $8, position = $9, is_private = $10 WHERE id = $11`, [channel.type, channel.id, channel.guild_id, channel.last_message_id, channel.name, channel.topic, channel.recipient == null ? 'NULL' : channel.recipient.id, overwrites, channel.position, channel.is_private == true ? 1 : 0, channel_id]);
+            await database.runQuery(`UPDATE channels SET type = $1, id = $2, guild_id = $3, last_message_id = $4, name = $5, topic = $6, permission_overwrites = $7, position = $8 WHERE id = $11`, [channel.type, channel.id, channel.guild_id, channel.last_message_id, channel.name, channel.topic, overwrites, channel.position, channel_id]);
 
             return true;    
         } catch(error: any) {
@@ -805,41 +803,38 @@ const database: Database = {
             return [];
         }
     },
-    getClosedDMChannels: async(user_id: string) => {
+    getDMChannelById: async (id: string) => {
         try {
-            const rows = await database.runQuery(`SELECT * FROM closed_channels WHERE user_id = $1`, [user_id]);
-            const channels: Channel[] = [];
+            const rows = await database.runQuery(`
+                SELECT * FROM dm_channels WHERE id = $1
+            `, [id]);
 
-            if (rows != null && rows.length > 0) {
-                for(var row of rows) {
-                    let channel = await database.getChannelById(row.channel_id);
+            if (rows == null || rows.length == 0) {
+                return null;
+            }
 
-                    if (channel != null) {
-                        channels.push(channel);
-                    }
-                }
-
-                return channels;
-            } else {
-                return [];
+            return {
+                id: rows[0].id,
+                last_message_id: rows[0].last_message_id,
+                author_of_channel_id: rows[0].author_of_channel_id,
+                receiver_of_channel_id: rows[0].receiver_of_channel_id,
+                is_closed: rows[0].is_closed == 1 ? true : false
             }
         } catch (error: any) {
             logText(error.toString(), "error");
 
-            return [];
+            return null;
         }
     },
-    isDMClosed: async (user_id: string, channel_id: string) => {
+    isDMClosed: async (channel_id: string) => {
         try {
-            let closedChannels: Channel[] = await database.getClosedDMChannels(user_id);
+            let dmChannel = await database.getDMChannelById(channel_id);
 
-            let channel = closedChannels.filter(x => x.id == channel_id);
-
-            if (channel.length == 0) {
+            if (dmChannel == null) {
                 return false;
             }
 
-            return true;
+            return dmChannel.is_closed;
         }
         catch (error: any) {
             logText(error.toString(), "error");
@@ -847,15 +842,20 @@ const database: Database = {
             return false;
         }
     },
-    closeDMChannel: async (user_id: string, channel_id: string) => {
+    openDMChannel: async (channel_id: string) => {
         try {
-            let alreadyClosed = await database.isDMClosed(user_id, channel_id);
+            await database.runQuery(`UPDATE dm_channels SET is_closed = $1 WHERE id = $2`, [0, channel_id]);
 
-            if (alreadyClosed) {
-                return true;
-            }
+            return true;
+        } catch (error: any) {
+            logText(error.toString(), "error");
 
-            await database.runQuery(`INSERT INTO closed_channels (user_id, channel_id) VALUES ($1, $2)`, [user_id, channel_id]);
+            return false;
+        }
+    },
+    closeDMChannel: async (channel_id: string) => {
+        try {
+            await database.runQuery(`UPDATE dm_channels SET is_closed = $1 WHERE id = $2`, [1, channel_id]);
 
             return true;
         } catch (error: any) {
@@ -1014,6 +1014,47 @@ const database: Database = {
             return null;
         }
     },
+    getDMChannelMessages: async (id: string, limit?: number, before_id?: string) => {
+        try {
+            let query = `SELECT * FROM messages WHERE channel_id = $1 `;
+            const params: any[] = [id];
+
+            if (before_id) {
+                query += 'AND message_id < $2 ';
+                params.push(before_id);
+            }
+
+            if (before_id) {
+                query += 'ORDER BY timestamp DESC LIMIT $3';
+            } else query += 'ORDER BY timestamp DESC LIMIT $2';
+
+            params.push(limit);
+
+            const rows = await database.runQuery(query, params);
+
+            if (rows == null || rows.length == 0) {
+                return [];
+            }
+
+            const ret: Message[] = [];
+
+            for (const row of rows) {
+                const message = await database.getMessageById(row.message_id);
+
+                if (message != null) {
+                    ret.push(message);
+                }
+            }
+
+            return ret;
+        } catch (error: any) {
+            console.log(error.toString());
+
+            logText(error.toString(), "error");
+
+            return [];
+        }
+    },
     getChannelMessages: async (id: string, limit?: number, before_id?: string) => {
         try {
             let query = `SELECT * FROM messages WHERE channel_id = $1 `;
@@ -1101,10 +1142,6 @@ const database: Database = {
                 type: rows[0].type,
                 topic: rows[0].topic == 'NULL' ? null : rows[0].topic,
                 last_message_id: rows[0].last_message_id,
-                recipient: rows[0].recipient_id == 'NULL' ? null : {
-                    id: rows[0].recipient_id
-                },
-                is_private: rows[0].is_private == 1 ? true : false,
                 permission_overwrites: overwrites,
                 position: rows[0].position
             }
@@ -1310,12 +1347,9 @@ const database: Database = {
             delete guild.region;
             delete guild.roles;
             delete guild.voice_states;
-            delete channel.guild_id;
-            delete channel.is_private;
             delete channel.last_message_id;
             delete channel.permission_overwrites;
             delete channel.position;
-            delete channel.recipient;
             delete channel.topic;
 
             return {
@@ -1681,27 +1715,27 @@ const database: Database = {
     },
     getDMChannels: async (user_id: string) => {
         try {
-            const ret: Channel[] = [];
-    
-            const channels_one = await database.runQuery(`SELECT * FROM channels WHERE recipient_id = $1`, [user_id]);
+            const rows = await database.runQuery(`
+                SELECT * FROM dm_channels WHERE author_of_channel_id = $1 OR receiver_of_channel_id = $2
+            `, [user_id, user_id]);
 
-            if (channels_one && Array.isArray(channels_one)) {
-                for (const row of channels_one) {
-                    const channels_two = await database.runQuery(`SELECT * FROM channels WHERE id = $1 AND recipient_id <> $2`, [row.id, user_id]);
+            if (rows != null && rows.length > 0) {
+                const ret: DMChannel[] = [];
 
-                    if (channels_two.length > 0) {
-                        let chan = await database.getChannelById(channels_two[0].id);
-    
-                        if (chan != null && chan.recipient != null) {
-                            chan.recipient.id = channels_two[0].recipient_id; 
-
-                            ret.push(chan);
-                        }
-                    }
+                for(var row of rows) {
+                    ret.push({
+                        id: row.id,
+                        last_message_id: row.last_message_id,
+                        author_of_channel_id: row.author_of_channel_id,
+                        receiver_of_channel_id: row.receiver_of_channel_id,
+                        is_closed: row.is_closed == 1 ? true : false
+                    });
                 }
-            }
 
-            return ret;
+                return ret;
+            } else {
+                return [];
+            }
         } catch (error: any) {
             logText(error.toString(), "error");
             return [];
@@ -1735,14 +1769,9 @@ const database: Database = {
         try {
             const channel_id = Snowflake.generate();
 
-            await database.runQuery(`INSERT INTO channels (id, type, guild_id, topic, last_message_id, recipient_id, is_private, permission_overwrites, name, position) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, [channel_id, 'text', 'NULL', 'NULL', '0', recipient_id, 1, 'NULL', recipient_id, 0])
-            await database.runQuery(`INSERT INTO channels (id, type, guild_id, topic, last_message_id, recipient_id, is_private, permission_overwrites, name, position) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, [channel_id, 'text', 'NULL', 'NULL', '0', sender_id, 1, 'NULL', sender_id, 0])
+            await database.runQuery(`INSERT INTO dm_channels (id, last_message_id, author_of_channel_id, receiver_of_channel_id, is_closed) VALUES ($1, $2, $3, $4, $5)`, [channel_id, '0', sender_id, recipient_id, 0])
 
-            const channel = await database.getChannelById(channel_id);
-
-            if (channel == null) {
-                return null;
-            }
+            const channel = await database.getDMChannelById(channel_id);
 
             return channel;
         } catch(error: any) {
@@ -2082,7 +2111,7 @@ const database: Database = {
             }
 
             await database.runQuery(`INSERT INTO guilds (id, name, icon, region, owner_id, afk_channel_id, afk_timeout, creation_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, [id, name, (icon == null ? 'NULL' : icon), (region == null ? "sydney" : region), owner_id, 'NULL', 300, date])
-            await database.runQuery(`INSERT INTO channels (id, type, guild_id, topic, last_message_id, recipient_id, is_private, permission_overwrites, name, position) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, [id, 'text', id, 'NULL', '0', 'NULL', 0, 'NULL', 'general', 0])
+            await database.runQuery(`INSERT INTO channels (id, type, guild_id, topic, last_message_id, permission_overwrites, name, position) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, [id, 'text', id, 'NULL', '0', 'NULL', 'general', 0]);
             //await database.runQuery(`INSERT INTO presences (user_id, game, status, guild_id) VALUES ($1, $2, $3, $4)`, [owner_id, 'NULL', 'online', id]);
             await database.runQuery(`INSERT INTO roles (guild_id, role_id, name, permissions, position) VALUES ($1, $2, $3, $4, $5)`, [id, id, '@everyone', 104193089, 0]); 
             await database.runQuery(`INSERT INTO members (guild_id, user_id, nick, roles, joined_at, deaf, mute) VALUES ($1, $2, $3, $4, $5, $6, $7)`, [id, owner_id, 'NULL', id, date, 0, 0]);

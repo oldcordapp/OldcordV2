@@ -6,6 +6,7 @@ import { logText } from '../../utils/logger';
 import me from "./me";
 import gateway from '../../gateway';
 import Channel from '../../interfaces/guild/channel';
+import DMChannel from '../../interfaces/dmchannel';
 import * as path from 'path';
 import Guild from '../../interfaces/guild';
 import Member from '../../interfaces/guild/member';
@@ -60,7 +61,7 @@ router.post("/:userid/channels", globalUtils.rateLimitMiddleware(100, 1000 * 60 
 
         const user = await database.getAccountByUserId(req.body.recipient_id);
 
-        if (user == null) {
+        if (user == null || !user.token) {
             return res.status(404).json({
                 code: 404,
                 message: "Unknown User"
@@ -74,76 +75,160 @@ router.post("/:userid/channels", globalUtils.rateLimitMiddleware(100, 1000 * 60 
             });
         }
 
-        const theirchannels: Channel[] = await database.getDMChannels(user.id);
-        const mychannels: Channel[] = await database.getDMChannels(account.id);
+        const dm_channels: DMChannel[] = await database.getDMChannels(account.id);
+        const openedAlready = dm_channels.find(x => x.receiver_of_channel_id == user.id || x.author_of_channel_id == user.id);
 
-        let already_id: string = '';
+        if (openedAlready) {
+            if (openedAlready.is_closed) {
+                await database.openDMChannel(openedAlready.id);
 
-        for (const their of theirchannels) {
-            for (const mine of mychannels) {
-                if (their.id === mine.id) {
-                    already_id = their.id;
-                    break;
-                }
-            }
-        }
-
-        if (already_id != '') {
-            const channel = mychannels.find((x) => x.id === already_id);
-
-            return res.status(200).json(channel);
-        } else {
-            const theirguilds: Guild[] = await database.getUsersGuilds(user.id);
-            const myguilds: Guild[] = await database.getUsersGuilds(account.id);
-
-            let share: boolean = false;
-
-            for(var their of theirguilds) {
-                if (their.members != null && their.members.length > 0) {
-                    const theirmembers: Member[] = their.members;
-
-                    if (theirmembers.filter(x => x.id == account.id).length > 0) {
-                        share = true;
+                gateway.dispatchEventTo(account.token, {
+                    op: 0,
+                    t: "CHANNEL_CREATE",
+                    s: null,
+                    d: {
+                        id: openedAlready.id,
+                        name: "", //dm channels have no name lol
+                        topic: "",
+                        position: 0,
+                        recipient: {
+                            id: user.id
+                        },
+                        type: "text",
+                        guild_id: null,
+                        is_private: true,
+                        permission_overwrites: []
                     }
-                }
-            }
-
-            for(var mine of myguilds) {
-                if (mine.members != null && mine.members.length > 0) {
-                    const mymembers: Member[] = mine.members;
-
-                    if (mymembers.filter(x => x.id == user.id).length > 0) {
-                        share = true;
+                });
+        
+                gateway.dispatchEventTo(user.token, {
+                    op: 0,
+                    t: "CHANNEL_CREATE",
+                    s: null,
+                    d: {
+                        id: openedAlready.id,
+                        name: "", //dm channels have no name lol
+                        topic: "",
+                        position: 0,
+                        recipient: {
+                            id: account.id
+                        },
+                        type: "text",
+                        guild_id: null,
+                        is_private: true,
+                        permission_overwrites: []
                     }
-                }
-            }
-
-            //horrendous code
-            if (!share) {
-                return res.status(403).json({
-                    code: 403,
-                    message: "Missing Permissions"
                 });
             }
 
-            const channel = await database.createDMChannel(account.id, user.id);
-
-            if (channel == null || !user.token) {
-                return res.status(500).json({
-                    code: 500,
-                    message: "Internal Server Error"
-                });
-            }
-    
-            await gateway.dispatchInDM(account.id, user.id, {
-                op: 0,
-                t: "CHANNEL_CREATE",
-                s: null,
-                d: channel
+            return res.status(200).json({
+                id: openedAlready.id,
+                name: "", //dm channels have no name lol
+                topic: "",
+                position: 0,
+                recipient: {
+                    id: user.id
+                },
+                type: "text",
+                guild_id: null,
+                is_private: true,
+                permission_overwrites: []
             });
-    
-            return res.status(200).json(channel);
         }
+
+        const theirguilds: Guild[] = await database.getUsersGuilds(user.id);
+        const myguilds: Guild[] = await database.getUsersGuilds(account.id);
+
+        let share: boolean = false;
+
+        for (var their of theirguilds) {
+            if (their.members != null && their.members.length > 0) {
+                const theirmembers: Member[] = their.members;
+
+                if (theirmembers.filter(x => x.id == account.id).length > 0) {
+                    share = true;
+                }
+            }
+        }
+
+        for (var mine of myguilds) {
+            if (mine.members != null && mine.members.length > 0) {
+                const mymembers: Member[] = mine.members;
+
+                if (mymembers.filter(x => x.id == user.id).length > 0) {
+                    share = true;
+                }
+            }
+        }
+
+        //horrendous code
+        if (!share) {
+            return res.status(403).json({
+                code: 403,
+                message: "Missing Permissions"
+            });
+        }
+
+        const channel = await database.createDMChannel(account.id, user.id);
+
+        if (channel == null || !user.token) {
+            return res.status(500).json({
+                code: 500,
+                message: "Internal Server Error"
+            });
+        }
+
+        gateway.dispatchEventTo(account.token, {
+            op: 0,
+            t: "CHANNEL_CREATE",
+            s: null,
+            d: {
+                id: channel.id,
+                name: "", //dm channels have no name lol
+                topic: "",
+                position: 0,
+                recipient: {
+                    id: user.id
+                },
+                type: "text",
+                guild_id: null,
+                is_private: true,
+                permission_overwrites: []
+            }
+        });
+
+        gateway.dispatchEventTo(user.token, {
+            op: 0,
+            t: "CHANNEL_CREATE",
+            s: null,
+            d: {
+                id: channel.id,
+                name: "", //dm channels have no name lol
+                topic: "",
+                position: 0,
+                recipient: {
+                    id: account.id
+                },
+                type: "text",
+                guild_id: null,
+                is_private: true,
+                permission_overwrites: []
+            }
+        });
+
+        return res.status(200).json({
+            id: channel.id,
+            name: "", //dm channels have no name lol
+            topic: "",
+            position: 0,
+            recipient: {
+                id: user.id
+            },
+            type: "text",
+            guild_id: null,
+            is_private: true,
+            permission_overwrites: []
+        });
     }
     catch(error: any) {
         logText(error.toString(), "error");

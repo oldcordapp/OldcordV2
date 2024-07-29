@@ -64,6 +64,13 @@ router.delete("/:memberid", globalUtils.guildPermissionsMiddleware("KICK_MEMBERS
             t: "GUILD_MEMBER_REMOVE",
             s: null,
             d: {
+                type: "kick",
+                moderator: {
+                  username: sender.username,
+                  avatar: sender.avatar,
+                  discriminator: sender.discriminator,
+                  id: sender.id
+                },
                 roles: [],
                 user: {
                     username: member.user.username,

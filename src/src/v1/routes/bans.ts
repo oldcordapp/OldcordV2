@@ -95,6 +95,13 @@ router.put("/:memberid", globalUtils.guildPermissionsMiddleware("BAN_MEMBERS"), 
             t: "GUILD_MEMBER_REMOVE",
             s: null,
             d: {
+              type: "ban",
+              moderator: {
+                username: sender.username,
+                avatar: sender.avatar,
+                discriminator: sender.discriminator,
+                id: sender.id
+              },
               user: {
                 username: member.user.username,
                 discriminator: member.user.discriminator,

@@ -3,8 +3,7 @@ import * as WebSocket from "ws";
 import { logText } from "./utils/logger";
 import database from "./utils/database";
 import globalUtils from "./utils/global";
-import Channel from "./interfaces/guild/channel";
-import Client from "./interfaces/gateway/client";
+import DMChannel from "./interfaces/dmchannel";
 import Member from "./interfaces/guild/member";
 
 const gateway: Gateway = {
@@ -427,23 +426,46 @@ const gateway: Gateway = {
                             }
                         }
 
-                        const dms = await database.getDMChannels(user.id) as Channel[];
+                        let dms = await database.getDMChannels(user.id) as DMChannel[];
+                        let dm_list: any[] = [];
 
                         for (const dm of dms) {
-                            let closed = await database.isDMClosed(user.id, dm.id);
+                            let closed = await database.isDMClosed(dm.id);
 
                             if (closed) {
-                                dms.splice(dms.indexOf(dm), 1);
+                                dms = dms.filter(x => x.id !== dm.id);
 
                                 continue;
                             }
 
-                            if (dm.recipient && dm.recipient.id == user.id) {
-                                const other_channels = dms.filter(y => y.id == dm.id && y.recipient && y.recipient.id != user?.id);
-
-                                if (other_channels.length > 0 && other_channels[0].recipient) {
-                                    dm.recipient.id = other_channels[0].recipient?.id;
-                                }
+                            if (dm.author_of_channel_id == user.id) {
+                                dm_list.push({
+                                    id: dm.id,
+                                    name: "", //dm channels have no name lol
+                                    topic: "", 
+                                    position: 0,
+                                    recipient: {
+                                        id: dm.receiver_of_channel_id
+                                    },
+                                    type: "text",
+                                    guild_id: null,
+                                    is_private: true,
+                                    permission_overwrites: []
+                                })
+                            } else {
+                                dm_list.push({
+                                    id: dm.id,
+                                    name: "", //dm channels have no name lol
+                                    topic: "", 
+                                    position: 0,
+                                    recipient: {
+                                        id: dm.author_of_channel_id
+                                    },
+                                    type: "text",
+                                    guild_id: null,
+                                    is_private: true,
+                                    permission_overwrites: []
+                                })
                             }
                         }
 
@@ -467,7 +489,7 @@ const gateway: Gateway = {
                             d: {
                                 guilds: guilds,
                                 presences: presences,
-                                private_channels: dms,
+                                private_channels: dm_list,
                                 read_state: read_states,
                                 tutorial: tutorial,
                                 user: user,
@@ -478,6 +500,7 @@ const gateway: Gateway = {
                                     enable_tts_command: settings?.includes("ENABLE_TTS_COMMAND:1"),
                                     theme: settings?.includes("THEME:DARK") ? "dark" : "light",
                                 },
+                                //user_guild_settings: [], //2015 december support
                                 heartbeat_interval: heartbeat_interval // It seems that in 2015 discord, the heartbeat is sent over the READY event?
                             }
                         });

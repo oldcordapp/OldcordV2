@@ -47,7 +47,6 @@ app.get('/attachments/:guildid/:channelid/:filename', async (req: any, res: any)
         let { width, height } = req.query;
         const url = req.url;
         
-
         if (!url || !width || !height || url.includes(".gif")) {
             return res.status(200).sendFile(path2);
         }

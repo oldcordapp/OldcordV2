@@ -4,6 +4,7 @@ import StandardError from './errors/standarderror'
 import LoginResponse from './responses/loginresponse'
 import Tutorial from './tutorial'
 import Channel from './guild/channel'
+import DMChannel from './dmchannel';
 import Member from './guild/member'
 import Role from './guild/role'
 import Presence from './presence'
@@ -31,6 +32,8 @@ interface Database {
     getGuildById: (id: string) => Promise<Guild | null>;
     getMessageById: (id: string) => Promise<Message | null>;
     getChannelById: (id: string) => Promise<Channel | null>;
+    getDMChannelById: (id: string) => Promise<DMChannel | null>;
+    getDMChannelMessages: (id: string, limit?: number, before_id?: string) => Promise<Message[] | []>;
     getChannelMessages: (id: string, limit?: number, before_id?: string) => Promise<Message[] | []>;
     getRoleById: (id: string) => Promise<Role | null>;
     getGuildWidget: (guild_id: string) => Promise<Widget | null>; 
@@ -47,9 +50,9 @@ interface Database {
     getGuildRoles: (id: string) => Promise<Role[] | []>;
     getUsersGuilds: (id: string) => Promise<Guild[] | []>;
     getTutorial: (user_id: string) => Promise<Tutorial | null>;
-    closeDMChannel: (user_id: string, channel_id: string) => Promise<boolean>;
-    isDMClosed: (user_id: string, channel_id: string) => Promise<boolean>;
-    getClosedDMChannels: (user_id: string) => Promise<Channel[] | []>;
+    openDMChannel: (channel_id: string) => Promise<boolean>;
+    closeDMChannel: (channel_id: string) => Promise<boolean>;
+    isDMClosed: (channel_id: string) => Promise<boolean>;
     getUsersMessagesInGuild: (guild_id: string, author_id: string) => Promise<Message[] | []>;
     getLatestAcknowledgement: (user_id: string, channel_id: string) => Promise<any | null>;
     acknowledgeMessage: (user_id: string, channel_id: string, message_id: string, mention_count: number) => Promise<boolean>;
@@ -69,8 +72,8 @@ interface Database {
     banMember: (guild_id: string, user_id: string) => Promise<boolean>;
     isBannedFromGuild: (guild_id: string, user_id: string) => Promise<boolean>;
     deleteInvite: (code: string) => Promise<boolean>;
-    getDMChannels: (user_id: string) => Promise<Channel[] | []>;
-    createDMChannel: (sender_id: string, recipient_id: string) => Promise<Channel | null>;
+    getDMChannels: (user_id: string) => Promise<DMChannel[] | []>;
+    createDMChannel: (sender_id: string, recipient_id: string) => Promise<DMChannel | null>;
     clearRoles: (guild_id: string, member_id: string) => Promise<boolean>;
     createRole: (guild_id: string, name: string, permissions: number, position: number) => Promise<Role | null>;
     addRole: (guild_id: string, role_id: string, user_id: string) => Promise<boolean>;

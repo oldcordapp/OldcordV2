@@ -36,7 +36,7 @@ router.post("/register", globalUtils.instanceMiddleware("NO_REGISTRATION"), glob
       req.body.password = globalUtils.generateString(20);
     }
 
-    if (req.body.username.length < 2) {
+    if (req.body.username.length < 2 || req.body.username.length > 32) {
       return res.status(400).json({
         code: 400,
         username: "Must be between 2 and 32 characters",
