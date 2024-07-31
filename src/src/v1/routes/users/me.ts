@@ -165,14 +165,55 @@ router.patch("/", globalUtils.rateLimitMiddleware(5, 1000 * 60 * 60), async (req
         });
       }
 
-      if (update_object.password.length > 64) {
+      if (update_object.new_password && update_object.new_password.length > 64) {
         return res.status(400).json({
           code: 400,
           password: "Must be under 64 characters"
         });
       }
 
+      const correctPassword = await database.doesThisMatchPassword(update_object.password, account.password);
+
+        if (!correctPassword) {
+          return res.status(400).json({
+            code: 400,
+            password: "Incorrect password"
+          })
+        }
+
       if ((update_object.email != account.email || update_object.username != account.username) || (update_object.email != account.email && update_object.username != account.username)) {
+        const correctPassword = await database.doesThisMatchPassword(update_object.password, account.password);
+
+        if (!correctPassword) {
+          return res.status(400).json({
+            code: 400,
+            password: "Incorrect password"
+          })
+        }
+
+        const update = await database.updateAccount(update_object.avatar, account.email, update_object.username, update_object.password, update_object.new_password, update_object.email);
+
+        if (update) {
+          let account2 = await database.getAccountByEmail(update_object.email);
+  
+          if (account2 != null && account2.token) {
+            delete account2.settings;
+            delete account2.password;
+            delete account2.created_at;
+  
+            await gateway.dispatchEventTo(account2.token, {
+              op: 0,
+              t: "USER_UPDATE",
+              s: null,
+              d: account2
+           })
+
+            await gateway.dispatchGuildMemberUpdateToAllTheirGuilds(account2.id);
+            
+            return res.status(200).json(account2);
+          }
+        }
+      } else if (update_object.new_password != null) {
         const correctPassword = await database.doesThisMatchPassword(update_object.password, account.password);
 
         if (!correctPassword) {

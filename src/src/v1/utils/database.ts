@@ -415,7 +415,8 @@ const database: Database = {
                     email: rows[0].email,
                     password: rows[0].password,
                     token: rows[0].token,
-                    verified: rows[0].verified == 1 ? true : false,
+                    verified: true,
+                    //verified: rows[0].verified == 1 ? true : false,
                     created_at: rows[0].created_at,
                     settings: rows[0].settings
                 };
@@ -469,7 +470,8 @@ const database: Database = {
                     email: rows[0].email,
                     password: rows[0].password,
                     token: rows[0].token,
-                    verified: rows[0].verified == 1 ? true : false,
+                    verified: true,
+                    //verified: rows[0].verified == 1 ? true : false,
                     created_at: rows[0].created_at,
                     settings: rows[0].settings
                 };
@@ -500,7 +502,8 @@ const database: Database = {
                         email: row.email,
                         password: row.password,
                         token: row.token,
-                        verified: row.verified == 1 ? true : false,
+                        verified: true,
+                        //verified: rows[0].verified == 1 ? true : false,
                         created_at: row.created_at,
                         settings: row.settings
                     })
@@ -530,7 +533,8 @@ const database: Database = {
                     email: rows[0].email,
                     password: rows[0].password,
                     token: rows[0].token,
-                    verified: rows[0].verified == 1 ? true : false,
+                    verified: true,
+                    //verified: rows[0].verified == 1 ? true : false,
                     created_at: rows[0].created_at,
                     avatar: rows[0].avatar == 'NULL' ? null : rows[0].avatar
                 };
@@ -2286,33 +2290,7 @@ const database: Database = {
                 await database.runQuery(`UPDATE users SET avatar = $1 WHERE id = $2`, ['NULL', account.id]);
             }
 
-            if ((new_email2 != account.email && new_username != account.username) || (new_email2 != account.email || new_username != account.username)) {
-                if (password == null) {
-                    return false;
-                }
-
-                const checkPassword = await database.doesThisMatchPassword(password, account.password);
-
-                if (!checkPassword) {
-                    return false;
-                }
-
-                if (new_password != null) {
-                    const checkPassword = await database.doesThisMatchPassword(new_password, account.password);
-
-                    if (checkPassword) {
-                        return false;
-                    }
-
-                    let salt = await genSalt(10);
-                    let newPwHash = await hash(new_password, salt);
-                    let token = globalUtils.generateToken(account.id, newPwHash);
-    
-                    await database.runQuery(`UPDATE users SET username = $1, email = $2, password = $3, token = $4 WHERE id = $5`, [new_username, new_email2, newPwHash, token, account.id]);
-                } else {
-                    await database.runQuery(`UPDATE users SET username = $1, email = $2 WHERE id = $3`, [new_username, new_email2, account.id]);
-                }
-            } else if (new_password != null) {
+            if (new_password != null) {
                 const checkPassword = await database.doesThisMatchPassword(new_password, account.password);
 
                 if (checkPassword) {
@@ -2324,6 +2302,22 @@ const database: Database = {
                 let token = globalUtils.generateToken(account.id, newPwHash);
 
                 await database.runQuery(`UPDATE users SET username = $1, email = $2, password = $3, token = $4 WHERE id = $5`, [new_username, new_email2, newPwHash, token, account.id]);
+
+                return true;
+            }
+
+            if ((new_email2 != account.email && new_username != account.username) || (new_email2 != account.email || new_username != account.username)) {
+                if (password == null) {
+                    return false;
+                }
+
+                const checkPassword = await database.doesThisMatchPassword(password, account.password);
+
+                if (!checkPassword) {
+                    return false;
+                }
+
+                await database.runQuery(`UPDATE users SET username = $1, email = $2 WHERE id = $3`, [new_username, new_email2, account.id]);
             }
             
             return true;
