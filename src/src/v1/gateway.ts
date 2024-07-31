@@ -500,7 +500,7 @@ const gateway: Gateway = {
                                     enable_tts_command: settings?.includes("ENABLE_TTS_COMMAND:1"),
                                     theme: settings?.includes("THEME:DARK") ? "dark" : "light",
                                 },
-                                //user_guild_settings: [], //2015 december support
+                                user_guild_settings: [], //2015 december support
                                 heartbeat_interval: heartbeat_interval // It seems that in 2015 discord, the heartbeat is sent over the READY event?
                             }
                         });

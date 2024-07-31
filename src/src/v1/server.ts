@@ -168,7 +168,8 @@ app.get("/assets/:asset", async (req: any, res: any) => {
                 str = str.replace(/discord.gg/g, (config.local_deploy ? config.base_url + ":" + config.port : config.base_url) + "/invites");
                 str = str.replace(/d3dsisomax34re.cloudfront.net/g, (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
                 str = str.replace(/discordapp.com/g, (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
-
+                str = str.replace(/.presence./g, ".presences."); //fix for 2015 june client presence typo
+                
                 body = Buffer.from(str);
 
                 fs.writeFileSync(`./assets/${req.params.asset}`, str, "utf-8");
