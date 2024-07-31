@@ -97,17 +97,11 @@ app.use(globalUtils.rateLimitMiddleware(1000, 60 * 60 * 1000));
 
 let cached404s = {};
 
-function convertTimestampToCustomFormat(timestamp) {
-    const dateObject = new Date(timestamp);
-  
-    const year = dateObject.getUTCFullYear();
-    const month = String(dateObject.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(dateObject.getUTCDate()).padStart(2, '0');
-    const hours = String(dateObject.getUTCHours()).padStart(2, '0');
-    const minutes = String(dateObject.getUTCMinutes()).padStart(2, '0');
-    const seconds = String(dateObject.getUTCSeconds()).padStart(2, '0');
-  
-    return `${year}${month}${day}${hours}${minutes}${seconds}`;
+function replaceAll(str: string, find: string, replace: string): string {
+    const escapedFind = find.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'); // Escape special characters
+    const regex = new RegExp(escapedFind, 'g');
+
+    return str.replace(regex, replace);
 }
 
 app.get("/assets/:asset", async (req: any, res: any) => {
@@ -168,7 +162,8 @@ app.get("/assets/:asset", async (req: any, res: any) => {
                 str = str.replace(/discord.gg/g, (config.local_deploy ? config.base_url + ":" + config.port : config.base_url) + "/invites");
                 str = str.replace(/d3dsisomax34re.cloudfront.net/g, (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
                 str = str.replace(/discordapp.com/g, (config.local_deploy ? config.base_url + ":" + config.port : config.base_url));
-                str = str.replace(/.presence./g, ".presences."); //fix for 2015 june client presence typo
+                str = replaceAll(str, ".presence.", ".presences."); //fix for 2015 june client presence typo
+                str = str.replace("var i=this._instance,o=i.context", "if(!this||!this._instance)return; var i=this._instance,o=i.context");
                 
                 body = Buffer.from(str);
 
